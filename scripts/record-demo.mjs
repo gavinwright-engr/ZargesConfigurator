@@ -2,6 +2,7 @@
 // Playwright's Chromium + ffmpeg: npx playwright install chromium
 import { chromium } from "playwright";
 import { mkdir, rename } from "node:fs/promises";
+import assert from "node:assert/strict";
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.CHROMIUM_EXECUTABLE
@@ -22,6 +23,19 @@ const page = await context.newPage();
 const video = page.video();
 await page.goto(process.env.BASE_URL || "http://localhost:3000");
 await page.waitForSelector("#scene svg");
+// Start with the product filling the workspace. Scale references are a later,
+// optional part of the tour; these are real UI controls, not altered app data.
+await page.locator("#human-scale").uncheck();
+await page.locator("#soccer-scale").uncheck();
+assert.equal(await page.locator("#human-scale").isChecked(), false);
+assert.equal(await page.locator("#soccer-scale").isChecked(), false);
+await page.mouse.move(20, 20);
+await page.evaluate(() => document.activeElement?.blur());
+await mkdir("docs/media", { recursive: true });
+await page.screenshot({
+  path: "docs/media/demo-poster.png",
+  animations: "disabled",
+});
 await page.evaluate(() => {
   const caption = document.createElement("div");
   caption.id = "demo-caption";
@@ -48,17 +62,9 @@ async function click(selector) {
   await page.waitForTimeout(550);
 }
 try {
-  await caption("K 470 Stack Planner · Your complete eight-case setup", 3000);
-  await caption("A 6-foot person puts the cases in perspective", 2000);
-  await page.locator("#soccer-scale").check();
-  await caption("Toggle a 22 cm soccer ball for another familiar scale", 2000);
-  await page.locator("#soccer-scale").uncheck();
-  await page.locator("#human-scale").uncheck();
-  await caption(
-    "Turn off scale references for a closer look at your cases",
-    2400,
-  );
-  await page.locator("#human-scale").check();
+  await caption("K 470 Stack Planner · Your complete eight-case setup", 4000);
+  await click('#scene [data-box-id="case-6"]');
+  await caption("Select a case to highlight its visible edges", 2300);
   await page.locator("#search").fill("829");
   await caption("All 25 standard K 470 sizes — from 13 to 829 liters", 1800);
   await click('[data-add="40876"]');
@@ -97,7 +103,10 @@ try {
     const boxes = JSON.parse(
       localStorage.getItem("zarges-stack-planner:v1"),
     ).boxes;
-    const t = getSceneTransform(boxes, CATALOG, "top"),
+    const t = getSceneTransform(boxes, CATALOG, "top", {
+        humanScale: document.querySelector("#human-scale").checked,
+        soccerScale: document.querySelector("#soccer-scale").checked,
+      }),
       m = document.querySelector("#scene svg").getScreenCTM();
     return [
       [1000, 200, 0],
@@ -113,6 +122,12 @@ try {
   await page.mouse.move(coords[1].x, coords[1].y, { steps: 70 });
   await page.waitForTimeout(700);
   await page.mouse.up();
+  // Verify the recording actually stacked the case with the current camera.
+  await page.waitForFunction(() =>
+    JSON.parse(localStorage.getItem("zarges-stack-planner:v1")).boxes.some(
+      (box) => box.modelId === "40810" && box.z === 410,
+    ),
+  );
   await page.waitForTimeout(1200);
   await click('button[data-view="iso"]');
   await caption(
@@ -121,6 +136,12 @@ try {
   );
   await click('[data-action="reset"]');
   await caption("Return to the two-stack reference arrangement", 2300);
+  await page.locator("#human-scale").check();
+  await caption("Optional scale reference: a 6-foot person", 2000);
+  await page.locator("#soccer-scale").check();
+  await caption("Or compare with a 22 cm soccer ball", 2000);
+  await page.locator("#human-scale").uncheck();
+  await page.locator("#soccer-scale").uncheck();
   await click('[data-action="export"]');
   await caption(
     "Export a model-by-model box list, ready to discuss with ZARGES",

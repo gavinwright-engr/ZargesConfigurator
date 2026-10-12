@@ -2,19 +2,19 @@
 
 A browser-based way to answer a simple question: **which cases fit together, and how much space will my setup take?**
 
-Choose from all **25 standard K 470 Universal Box sizes (13–829 L)**, drag dimensionally accurate cases into a stack, inspect the result from three views, and export a model-by-model box list. A **6-foot / 1828.8 mm person** provides a real-world scale reference. The default scene recreates the two stacks in the original reference: **8 cases, 567 L, 47.4 kg empty**.
+Choose from all **25 standard K 470 Universal Box sizes (13–829 L)**, drag dimensionally accurate cases into a stack, inspect the result from three views, and export a model-by-model box list. Optional **6-foot / 1828.8 mm person** and **22 cm soccer ball** references make scale easier to judge. The default scene recreates the two stacks in the original reference: **8 cases, 567 L, 47.4 kg empty**.
 
 An independent, open-source product concept by Gavin Wright. Not affiliated with or endorsed by ZARGES.
 
-![Desktop planner showing the complete eight-case reference arrangement](docs/media/desktop.png)
+![Desktop planner with all eight reference cases closely framed and both scale references switched off](docs/media/demo-poster.png)
 
 ## See it in action
 
 [**Watch the video demo — MP4**](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
 
-[![Animated demo: inspect dimensions, drag a case onto a stack, and export the box list](docs/media/demo.gif)](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
+[![Screen recording: select cases, copy and paste, switch views, drag a case onto a stack, and export the box list](docs/media/demo.gif)](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
 
-The video records the actual application: selection, copy/paste, scale references, dimensions, camera views, drag-and-drop stacking, reference reset, CSV export, and fit information. [Reproduce the screenshots and recording](docs/media/README.md).
+The recording opens with **both the person and soccer ball off**, giving the cases the full workspace. It demonstrates visible-edge selection, the complete catalog, copy/paste, dimensions, front/top/3D views, actual drag-and-drop stacking, CSV export, and fit information. The optional scale references appear briefly later in the tour. [Reproduce the screenshots and recording](docs/media/README.md).
 
 ## Run it
 
@@ -43,13 +43,28 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 
 Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow keys move 10 mm; **Ctrl/Cmd+C / V** copies / pastes; **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** redoes. Move upper cases before moving or removing their supports. The surface selector provides stacking without dragging.
 
-![Close-up of the mixed-height right stack, with hardware inside each case envelope and separate capacity and product labels](docs/media/stack-detail.png)
+## Screenshots
 
-![The camera fits the cases closely when scale references are hidden](docs/media/boxes-fit.png)
+**Visible-edge selection.** The selected 60 L case is outlined where it is visible; neighboring boxes hide the covered edges.
+
+![Close-up of the selected 60 L case showing its visible front edges, with no highlight through neighboring cases](docs/media/selection-detail.png)
+
+**Space to build.** New cases can be placed in front of or behind the reference setup.
 
 ![A new case placed on the floor in front of the reference stacks](docs/media/front-placement.png)
 
+**Footprint and dimensions.** Top view makes the layout easy to compare.
+
 ![Top view with footprint dimensions](docs/media/top-view.png)
+
+<details>
+<summary>Optional scale reference and unselected stack detail</summary>
+
+![Desktop planner with the six-foot person enabled for scale](docs/media/desktop.png)
+
+![Mixed-height right stack with separate capacity and product labels](docs/media/stack-detail.png)
+
+</details>
 
 <details>
 <summary>Responsive mobile screenshot</summary>
