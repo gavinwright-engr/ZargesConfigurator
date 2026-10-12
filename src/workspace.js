@@ -9,7 +9,9 @@ import { getDimensions, inspectLayout, validatePlacement } from "./stacking.js";
 
 export const WORKSPACE = Object.freeze({
   x: 0,
-  y: 0,
+  // The reference arrangement occupies y=0..600. Leave 900 mm on either side
+  // without translating saved case coordinates or moving the stage during drag.
+  y: -900,
   length: 4500,
   width: 2400,
   maxHeight: 3000,
@@ -122,8 +124,12 @@ export function validateWorkspace(boxes, catalog) {
   return { valid: issues.length === 0, issues };
 }
 
-function axisPositions(bounds, axis, size, origin, extent) {
-  const positions = new Set([origin, origin + extent - size]);
+function axisPositions(bounds, axis, size, origin, extent, preferred = origin) {
+  const positions = new Set([
+    origin,
+    origin + extent - size,
+    Math.max(origin, Math.min(preferred, origin + extent - size)),
+  ]);
   for (const bound of bounds) {
     const start = bound[`${axis}1`];
     const end = bound[`${axis}2`];
@@ -151,10 +157,11 @@ function axisPositions(bounds, axis, size, origin, extent) {
  *
  * Supply { id, rotated }; `id` is required and identifies a new instance or the
  * existing case being moved. The returned instance contains only plan fields.
- * Search is deterministic: prefer the front row, then later rows, with a small
- * preference for 100 mm clearance. Flush placement remains available when the
- * stage is nearly full. We search rectangle edges rather than an arbitrary grid
- * so every catalog size can fit without changing its dimensions.
+ * Search is deterministic: start new layouts at y=0, then prefer rows near the
+ * existing group's depth center, in either direction, with 100 mm clearance.
+ * A deep case's initial baseline is clamped to fit the fixed stage. Flush
+ * placement remains available when the stage is nearly full. We search rectangle
+ * edges rather than an arbitrary grid so all catalog sizes retain their dimensions.
  */
 export function findFloorPlacement(modelId, boxes, catalog, options = {}) {
   if (
@@ -170,7 +177,7 @@ export function findFloorPlacement(modelId, boxes, catalog, options = {}) {
     id: options.id,
     modelId,
     x: WORKSPACE.x,
-    y: WORKSPACE.y,
+    y: 0,
     z: 0,
     rotated: Boolean(options.rotated),
   };
@@ -192,7 +199,16 @@ export function findFloorPlacement(modelId, boxes, catalog, options = {}) {
   }
 
   const xs = axisPositions(bounds, "x", length, WORKSPACE.x, WORKSPACE.length);
-  const ys = axisPositions(bounds, "y", width, WORKSPACE.y, WORKSPACE.width);
+  const ys = axisPositions(bounds, "y", width, WORKSPACE.y, WORKSPACE.width, 0);
+  const homeRow = Math.max(
+    WORKSPACE.y,
+    Math.min(0, WORKSPACE.y + WORKSPACE.width - width),
+  );
+  const depthCenter = bounds.length
+    ? (Math.min(...bounds.map((bound) => bound.y1)) +
+        Math.max(...bounds.map((bound) => bound.y2))) /
+      2
+    : homeRow + width / 2;
   const positions = [];
   for (const y of ys) {
     for (const x of xs) {
@@ -206,7 +222,7 @@ export function findFloorPlacement(modelId, boxes, catalog, options = {}) {
         positions.push({
           placed,
           clearancePenalty,
-          score: y + clearancePenalty,
+          score: Math.abs(y + width / 2 - depthCenter) + clearancePenalty,
         });
       }
     }
@@ -215,7 +231,8 @@ export function findFloorPlacement(modelId, boxes, catalog, options = {}) {
     (a, b) =>
       a.score - b.score ||
       a.clearancePenalty - b.clearancePenalty ||
-      a.placed.y - b.placed.y ||
+      Math.abs(a.placed.y - homeRow) - Math.abs(b.placed.y - homeRow) ||
+      b.placed.y - a.placed.y ||
       a.placed.x - b.placed.x,
   );
   for (const { placed } of positions) {

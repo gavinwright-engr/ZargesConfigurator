@@ -34,7 +34,8 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 - **Explore the full catalog:** browse or search all 25 standard K 470 sizes, or filter to the six models in the reference arrangement. The catalog scrolls independently of the workspace.
 - **Place precisely:** select a case to rotate, remove, or move it in 10 mm steps. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
 - **Copy and paste:** select a case and use **Ctrl/Cmd+C**, then **Ctrl/Cmd+V**, or the **Copy** and **Paste** buttons. Each copy keeps its model and rotation and appears in a nearby clear floor spot. Pasting is undoable; text fields retain normal text editing.
-- **Keep cases together:** the visible work area is **4.5 × 2.4 m**, with a **3 m** height limit. Gaps between neighboring stacks can be at most **60 cm**. Distant drops stay in their original position; new cases wrap into nearby rows. These are planner settings, not manufacturer limits.
+- **Place cases in front or behind:** the **4.5 × 2.4 m** floor leaves **900 mm of free space on each side** of the reference setup in the depth direction. Drag new cases into either area. The floor stays fixed while you build; the camera keeps the cases close.
+- **Keep cases together:** the height limit is **3 m**, and gaps between neighboring stacks can be at most **60 cm**. Distant drops stay in their original position; new cases use nearby rows. These are planner settings, not manufacturer limits.
 - **Compare sizes:** switch between perspective, front, and top views; show dimensions; toggle millimeters/inches. The model always retains millimeter precision.
 - **Get a sense of scale:** independently toggle the **6-foot person** and a **22 cm soccer ball**. The camera fits the cases and enabled references; hiding both gives a closer view. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
 - **Keep your work:** automatic device-local saving, undo/redo, JSON import/export, and a URL that restores the configuration.
@@ -45,6 +46,8 @@ Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow k
 ![Close-up of the mixed-height right stack, with hardware inside each case envelope and separate capacity and product labels](docs/media/stack-detail.png)
 
 ![The camera fits the cases closely when scale references are hidden](docs/media/boxes-fit.png)
+
+![A new case placed on the floor in front of the reference stacks](docs/media/front-placement.png)
 
 ![Top view with footprint dimensions](docs/media/top-view.png)
 

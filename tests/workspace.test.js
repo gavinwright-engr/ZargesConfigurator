@@ -21,7 +21,7 @@ const box = (id, modelId = "40564", x = 0, y = 0, z = 0, rotated = false) => ({
 test("the reference layout fits the physical stage and its two stacks stay connected", () => {
   assert.deepEqual(WORKSPACE, {
     x: 0,
-    y: 0,
+    y: -900,
     length: 4500,
     width: 2400,
     maxHeight: 3000,
@@ -32,9 +32,9 @@ test("the reference layout fits the physical stage and its two stacks stay conne
 });
 
 test("bounds apply to complete rotated envelopes, including top height", () => {
-  const exact = box("edge", "40876", 3700, 700, 2300, true);
+  const exact = box("edge", "40876", 3700, -200, 2300, true);
   assert.equal(validateWorkspace([exact], CATALOG).valid, true);
-  for (const change of [{ x: 3700.01 }, { y: 700.01 }, { z: 2300.01 }]) {
+  for (const change of [{ x: 3700.01 }, { y: -199.99 }, { z: 2300.01 }]) {
     const result = validateWorkspace([{ ...exact, ...change }], CATALOG);
     assert.equal(result.valid, false);
     assert.equal(result.issues[0].code, "workspace-bounds");
@@ -44,7 +44,7 @@ test("bounds apply to complete rotated envelopes, including top height", () => {
     validateWorkspace([box("wide", "40876", 3000)], CATALOG).valid,
     false,
   );
-  for (const axis of ["x", "y", "z"]) {
+  for (const axis of ["x", "z"]) {
     assert.equal(
       validateWorkspace([{ ...box("negative"), [axis]: -1 }], CATALOG).valid,
       false,
@@ -54,8 +54,27 @@ test("bounds apply to complete rotated envelopes, including top height", () => {
 
 test("a single bounded case is allowed away from the origin", () => {
   assert.equal(
-    validateWorkspace([box("single", "40835", 4000, 2000)], CATALOG).valid,
+    validateWorkspace([box("single", "40835", 4000, 1200)], CATALOG).valid,
     true,
+  );
+});
+
+test("the front strip accepts negative y while both fixed depth edges reject protrusion", () => {
+  const front = box("front", "40810", 0, -900, 0, true);
+  const layout = [box("original"), front];
+  assert.equal(validateWorkspace(layout, CATALOG).valid, true);
+  assert.equal(inspectLayout(layout, CATALOG).valid, true);
+  assert.equal(
+    validateWorkspace([{ ...front, y: -900.01 }], CATALOG).valid,
+    false,
+  );
+  assert.equal(
+    validateWorkspace([box("rear-edge", "40564", 0, 1100)], CATALOG).valid,
+    true,
+  );
+  assert.equal(
+    validateWorkspace([box("past-rear", "40564", 0, 1100.01)], CATALOG).valid,
+    false,
   );
 });
 
@@ -123,7 +142,9 @@ test("each catalog model can start on the bounded floor in either orientation", 
         rotated,
       });
       assert.ok(placed, `${model.id} must fit as a first case`);
-      assert.deepEqual([placed.x, placed.y, placed.z], [0, 0, 0]);
+      const depth = model.external[rotated ? 0 : 1];
+      const baseline = Math.min(0, 1500 - depth);
+      assert.deepEqual([placed.x, placed.y, placed.z], [0, baseline, 0]);
       assert.equal(placed.rotated, rotated);
       assert.equal(validateWorkspace([placed], CATALOG).valid, true);
       assert.equal(inspectLayout([placed], CATALOG).valid, true);
@@ -147,6 +168,15 @@ test("additions stay near the group with useful front-row clearance", () => {
   );
 });
 
+test("adding beside a group in the front strip preserves its existing row", () => {
+  const first = box("first", "40564", 0, -500);
+  const placed = findFloorPlacement("40564", [first], CATALOG, {
+    id: "second",
+  });
+  assert.ok(placed);
+  assert.deepEqual([placed.x, placed.y, placed.z], [700, -500, 0]);
+});
+
 test("a full front row uses the next row instead of extending beyond the stage", () => {
   const catalog = [...CATALOG, { id: "row", external: [4500, 400, 200] }];
   const placed = findFloorPlacement("40564", [box("front", "row")], catalog, {
@@ -156,10 +186,26 @@ test("a full front row uses the next row instead of extending beyond the stage",
   assert.deepEqual([placed.x, placed.y, placed.z], [0, 500, 0]);
 });
 
+test("floor search uses a nearby front row when the rear area is occupied", () => {
+  const catalog = [
+    ...CATALOG,
+    { id: "row", external: [4500, 400, 200] },
+    { id: "rear", external: [4500, 1000, 200] },
+  ];
+  const existing = [box("baseline", "row"), box("rear-area", "rear", 0, 500)];
+  const placed = findFloorPlacement("40564", existing, catalog, {
+    id: "front",
+  });
+  assert.ok(placed);
+  assert.deepEqual([placed.x, placed.y, placed.z], [0, -500, 0]);
+  assert.equal(validateWorkspace([...existing, placed], catalog).valid, true);
+  assert.equal(inspectLayout([...existing, placed], catalog).valid, true);
+});
+
 test("a full floor returns null rather than placing a case outside the work area", () => {
   const catalog = [...CATALOG, { id: "floor", external: [4500, 2400, 200] }];
   assert.equal(
-    findFloorPlacement("40835", [box("occupied", "floor")], catalog, {
+    findFloorPlacement("40835", [box("occupied", "floor", 0, -900)], catalog, {
       id: "extra",
     }),
     null,
@@ -231,7 +277,7 @@ test("repair brings a saved distant 259 L case back beside the unchanged referen
 
 test("repair preserves the largest group even when an isolated in-bounds case appears first", () => {
   const saved = [
-    box("isolated", "40835", 4000, 2000),
+    box("isolated", "40835", 4000, 1200),
     ...structuredClone(PRESET),
   ];
   const repaired = repairWorkspace(saved, CATALOG);
@@ -260,9 +306,19 @@ test("repair reconstructs an entirely out-of-bounds layout and copies an already
   assert.notEqual(copied[0], PRESET[0]);
 });
 
+test("repair preserves valid saved front placements and the reference coordinates", () => {
+  const saved = [...structuredClone(PRESET), box("front", "40564", 0, -500)];
+  const repaired = repairWorkspace(saved, CATALOG);
+  assert.deepEqual(repaired, saved);
+  assert.notEqual(repaired, saved);
+});
+
 test("repair never drops a case when the retained group leaves no floor space", () => {
   const catalog = [...CATALOG, { id: "floor", external: [4500, 2400, 200] }];
-  const saved = [box("occupied", "floor"), box("outlier", "40835", 10000)];
+  const saved = [
+    box("occupied", "floor", 0, -900),
+    box("outlier", "40835", 10000),
+  ];
   const before = structuredClone(saved);
   assert.equal(repairWorkspace(saved, catalog), null);
   assert.deepEqual(saved, before);

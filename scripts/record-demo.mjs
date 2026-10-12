@@ -78,7 +78,7 @@ try {
   );
   await click('[data-action="undo"]');
   await caption(
-    "A bounded work area keeps every new case close to your setup",
+    "Equal floor space in front and behind your reference setup",
     2000,
   );
   await click("#dimensions");

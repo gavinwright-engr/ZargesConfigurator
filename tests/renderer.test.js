@@ -285,6 +285,41 @@ test("the camera closely frames the cases independently of the bounded floor", (
   );
 });
 
+test("the rendered floor leaves equal placeable depth in front of and behind the reference boxes", () => {
+  const near = Math.min(...PRESET.map((box) => box.y));
+  const far = Math.max(
+    ...PRESET.map((box) => {
+      const model = CATALOG.find((model) => model.id === box.modelId);
+      return box.y + model.external[box.rotated ? 0 : 1];
+    }),
+  );
+  for (const view of ["iso", "top"]) {
+    const svg = renderScene(PRESET, CATALOG, { view });
+    const transform = getSceneTransform(PRESET, CATALOG, view);
+    const boundary = svg.match(
+      /<polygon points="([^"]+)"[^>]*class="workspace-boundary"/,
+    );
+    assert(
+      boundary,
+      "The visible floor must use the actual placeable boundary",
+    );
+    const world = boundary[1].split(" ").map((point) => {
+      const [x, y] = point.split(",").map(Number);
+      return transform.unproject(x, y, 0);
+    });
+    const frontSpace = near - Math.min(...world.map((point) => point.y));
+    const backSpace = Math.max(...world.map((point) => point.y)) - far;
+    assert(
+      Math.abs(frontSpace - backSpace) < 0.15,
+      `${view}: free depth should be split equally`,
+    );
+    assert(
+      Math.abs(frontSpace - 900) < 0.15,
+      "There must be room for a new row in front",
+    );
+  }
+});
+
 test("the optional soccer ball is 220 mm in every view and camera configuration", () => {
   assert.doesNotMatch(renderScene(PRESET, CATALOG), /data-soccer-diameter-mm/);
   assert.doesNotMatch(

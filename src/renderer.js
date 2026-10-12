@@ -648,13 +648,15 @@ function drawFloor(items, drawing, prefix, options) {
     );
   }
   if (view !== "front") {
-    for (let x = minX; x <= maxX; x += 200)
+    // Keep the 200 mm grid anchored at world zero even when the stage starts
+    // at a negative coordinate. Matching partial cells appear at both depth edges.
+    for (let x = Math.ceil(minX / 200) * 200; x <= maxX; x += 200)
       art += line(
         [x, minY, 0],
         [x, maxY, 0],
         'stroke="#bdcbd3" stroke-width=".7" opacity=".24"',
       );
-    for (let y = minY; y <= maxY; y += 200)
+    for (let y = Math.ceil(minY / 200) * 200; y <= maxY; y += 200)
       art += line(
         [minX, y, 0],
         [maxX, y, 0],

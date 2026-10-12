@@ -97,9 +97,18 @@ below 3,000 mm high. Footprints must form a connected group with edge-to-edge
 gaps no greater than 600 mm. These constants are interface choices, separate
 from manufacturer dimensions and reusable collision/support geometry.
 
+The fixed floor depth runs from **y = -900 to 1500 mm**. The reference setup
+occupies y = 0 to 600 mm, so the remaining 1800 mm is split equally in front
+and behind it. Negative y is valid floor space in front of the original cases;
+z stays nonnegative. Existing case coordinates and stack heights are unchanged.
+The floor does not follow a dragged case or expand to accommodate it. Grid lines
+remain on 200 mm world coordinates, with equal partial cells at the depth edges.
+
 All additions, rotations, nudges, imports, and drag commits pass workspace
-validation. `findFloorPlacement` searches nearby rectangle edges, including
-later rows, preserves orientation, and returns `null` when no valid spot fits.
+validation. `findFloorPlacement` searches nearby rectangle edges in both depth
+directions, preserves orientation, and returns `null` when no valid spot fits.
+It prefers the existing row instead of the front edge of the floor; the first
+case starts at y = 0, adjusted only if its depth requires more room.
 It never extends the stage to accommodate a distant case.
 
 When opening older unbounded sessions, `repairWorkspace` keeps the main valid
