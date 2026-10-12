@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Plan your ZARGES K 470 setup. Compare case sizes, build dimensionally accurate stacks, and export your box list."
+    />
+    <meta name="theme-color" content="#00599b" />
+    <title>K 470 Stack Planner · ZARGES Concept</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%2300599b'/%3E%3Cpath d='M10 11h20L10 29h20' fill='none' stroke='white' stroke-width='4'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script type="module" src="./src/app.js"></script>
+  </head>
+  <body>
+    <div class="utility">
+      <span>Aluminum. Built for possibilities.</span
+      ><span
+        >Independent product concept <span class="utility-dot">•</span> K 470
+        series</span
+      >
+    </div>
+    <header class="header">
+      <a href="./" class="brand" aria-label="ZARGES Stack Planner home"
+        >ZARGES<span class="brand-mark">®</span
+        ><small>INNOVATIONS IN ALUMINIUM</small></a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#workspace" class="nav-active">Stack planner</a
+        ><button data-action="catalog-dialog">Explore the cases</button
+        ><button data-action="guide">
+          How it works
+          <span
+            ><svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 12 12 4M4 4h8v8" /></svg
+          ></span>
+        </button>
+      </nav>
+      <a
+        class="header-product"
+        href="https://www.zarges.com/en/products/k-470-universal-box"
+        target="_blank"
+        rel="noreferrer"
+        >Explore K 470
+        <span
+          ><svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4 12 12 4M4 4h8v8" /></svg></span
+      ></a>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <div class="eyebrow">
+            TRANSPORT & STORAGE <span>/</span> YOUR SETUP, IN PERSPECTIVE
+          </div>
+          <h1>Great gear. <span>Better together.</span></h1>
+          <p>Find your sizes. Build your stack. Make room for what’s next.</p>
+        </div>
+        <div class="intro-note">
+          <span class="tiny-cube">◇</span>
+          <div>
+            <strong>Real dimensions. Real possibilities.</strong
+            ><span>Plan with the K 470 aluminum case system.</span>
+          </div>
+        </div>
+      </section>
+      <section
+        id="workspace"
+        class="workspace"
+        aria-label="Interactive stack planner"
+      >
+        <aside class="catalog">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">01 / CHOOSE YOUR CASES</span>
+              <h2>The K 470 collection</h2>
+            </div>
+            <span class="count-badge">6</span>
+          </div>
+          <div class="search-wrap">
+            <span aria-hidden="true">⌕</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="Search size or model…"
+              aria-label="Search cases by volume or model"
+            />
+          </div>
+          <div class="catalog-caption">
+            <span>EXTERIOR L × W × H</span>
+            <div class="segmented small" aria-label="Dimension units">
+              <button class="active" data-unit="mm" aria-pressed="true">
+                mm</button
+              ><button data-unit="in" aria-pressed="false">in</button>
+            </div>
+          </div>
+          <div id="catalog-list" class="catalog-list"></div>
+          <div class="catalog-tip">
+            <span
+              ><svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 12 12 4M4 4h8v8" /></svg
+            ></span>
+            <p>
+              <strong>Build it your way</strong>Drag a case into the workspace,
+              or use + to add it to the floor.
+            </p>
+          </div>
+        </aside>
+        <div class="studio">
+          <div class="studio-toolbar">
+            <div class="setup-title">
+              <span class="live-dot"></span><strong>Your configuration</strong
+              ><span id="saved-state">Saved on this device</span>
+            </div>
+            <div class="toolbar-actions">
+              <button
+                class="icon-button"
+                id="undo"
+                data-action="undo"
+                title="Undo (Ctrl/Cmd+Z)"
+                aria-label="Undo"
+              >
+                ↶</button
+              ><button
+                class="icon-button"
+                id="redo"
+                data-action="redo"
+                title="Redo (Ctrl/Cmd+Shift+Z)"
+                aria-label="Redo"
+              >
+                ↷</button
+              ><span class="divider"></span
+              ><button class="text-button" data-action="reset">
+                ↺ <span>Reference setup</span>
+              </button>
+            </div>
+          </div>
+          <div class="canvas-wrap" id="canvas-wrap">
+            <div class="canvas-top">
+              <div class="segmented views" aria-label="View">
+                <button data-view="iso" class="active" aria-pressed="true">
+                  3D view</button
+                ><button data-view="front" aria-pressed="false">Front</button
+                ><button data-view="top" aria-pressed="false">Top</button>
+              </div>
+              <label class="dimension-toggle"
+                ><input id="dimensions" type="checkbox" /> Dimensions</label
+              >
+            </div>
+            <div id="scene" class="scene" aria-label="Stack workspace"></div>
+            <div class="canvas-bottom">
+              <span
+                ><span class="live-dot"></span>
+                <span id="fit-indicator">All cases supported</span></span
+              ><span class="canvas-instruction"
+                >Drag to move · Click to inspect · R to rotate</span
+              ><button
+                class="icon-button"
+                data-action="fit"
+                title="Fit view"
+                aria-label="Fit view"
+              >
+                ⛶
+              </button>
+            </div>
+            <div id="empty-state" class="empty-state" hidden>
+              <span>◇</span>
+              <h3>A little space. A lot of possibility.</h3>
+              <p>Add a case from the collection to start your setup.</p>
+              <button class="primary" data-action="reset">
+                Load reference setup
+              </button>
+            </div>
+          </div>
+          <div class="configuration-footer">
+            <div>
+              <span class="eyebrow">INSPIRED BY YOUR ADVENTURE</span
+              ><strong id="configuration-label"
+                >Two stacks. One organized setup.</strong
+              >
+            </div>
+            <div class="footer-actions">
+              <button class="text-button" data-action="clear">
+                Clear workspace</button
+              ><button class="secondary" data-action="share">
+                Share setup
+                <span
+                  ><svg
+                    class="arrow-icon"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 12 12 4M4 4h8v8" /></svg
+                ></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <aside class="inspector">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">02 / YOUR CONFIGURATION</span>
+              <h2>Ready for anything.</h2>
+            </div>
+          </div>
+          <div class="summary-grid">
+            <div><strong id="total-boxes">8</strong><span>CASES</span></div>
+            <div>
+              <strong id="total-volume">567<small> L</small></strong
+              ><span>TOTAL CAPACITY</span>
+            </div>
+          </div>
+          <div class="summary-meta">
+            <span>Empty weight</span><strong id="total-weight">47.4 kg</strong>
+          </div>
+          <div class="summary-meta">
+            <span>Maximum height</span
+            ><strong id="total-height">1,000 mm</strong>
+          </div>
+          <div id="selection" class="selection"></div>
+          <div class="list-heading">
+            <h3>Your box list</h3>
+            <span id="list-count">6 models</span>
+          </div>
+          <div id="box-list" class="box-list"></div>
+          <button class="primary export-button" data-action="export">
+            Export box list <span>↓</span></button
+          ><button class="text-button save-file" data-action="save">
+            Save plan (.json) <span>↓</span></button
+          ><button class="text-button save-file" data-action="import">
+            Open saved plan <span>↑</span></button
+          ><input
+            id="import-file"
+            type="file"
+            accept=".json,application/json"
+            hidden
+          />
+          <div class="fit-note">
+            <span>ⓘ</span>
+            <p>
+              <strong>A fit you can plan around.</strong>Based on published
+              outer dimensions. Mixed-size corner engagement and load limits
+              need confirmation from ZARGES.
+              <button data-action="fit-details">
+                See fit details
+                <svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M4 12 12 4M4 4h8v8" />
+                </svg>
+              </button>
+            </p>
+          </div>
+        </aside>
+      </section>
+      <div class="below-workspace">
+        <span
+          ><span class="blue-square"></span> Engineered in aluminum. Configured
+          by you.</span
+        ><span
+          >8-case reference setup <span>·</span> Metric source data
+          <span>·</span> Runs entirely in your browser</span
+        >
+      </div>
+    </main>
+    <footer class="site-footer">
+      <span
+        >Independent concept for ZARGES K 470. Not affiliated with or endorsed
+        by ZARGES.</span
+      ><a
+        href="https://github.com/gavinwright-engr/ZargesConfigurator"
+        target="_blank"
+        rel="noreferrer"
+        >View the open-source project
+        <svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4 12 12 4M4 4h8v8" /></svg
+      ></a>
+    </footer>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog id="dialog">
+      <button class="dialog-close icon-button" aria-label="Close dialog">
+        ×
+      </button>
+      <div id="dialog-content"></div>
+    </dialog>
+  </body>
+</html>
