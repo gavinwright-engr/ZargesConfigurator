@@ -148,12 +148,19 @@ figure is exactly 1828.8 mm (6 ft) tall. The independent `soccerScale` option
 (default `false`) draws a 220 mm diameter soccer ball. Neither reference affects
 collision, support, capacity, mass, or order quantities. Thumbnails omit them.
 `workspace: false` omits the bounded floor for isolated product illustrations.
-Case panels, hardware, and labels remain inside their maximum envelopes;
-the selection highlight is the only intentional outline outside a case.
+Case panels, hardware, labels, and selection highlights remain inside their
+maximum envelopes.
 Selection is a final SVG overlay with pointer events disabled. It traces the
-selected envelope and, in 3D, all three visible face seams. Neighboring cases
-cannot paint over its edges, and it does not change artwork order, hit targets,
-or camera bounds.
+selected envelope and, in 3D, the three front/side/lid seams. A luminance mask
+clips the stroke inside that envelope and subtracts the envelopes of cases
+later in the same painter order. This preserves exposed edges while hiding
+covered portions, including fully covered cases in front/top views. Using solid
+envelopes prevents highlights leaking through small gaps in the illustrated
+hardware. The overlay does not change artwork order, hit targets, or camera bounds.
+If one foreground silhouette completely contains the selection, or rectangles
+jointly cover it in front/top views, the overlay is also suppressed to avoid an
+antialias fringe along coincident mask boundaries. Flat views reuse the same
+rectangle-union calculation as physical support validation.
 
 The catalog includes the complete 25-size standard European K 470 Universal Box
 range. The six reference models are marked `reference: true`; that flag changes

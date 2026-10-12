@@ -62,8 +62,9 @@ function overlap(a1, a2, b1, b2) {
 /**
  * Compute a rectangle union with an x-axis sweep. Summing support areas would
  * double-count overlapping supports and could falsely approve a gap elsewhere.
+ * The renderer also uses this to detect full coverage in front/top projections.
  */
-function rectangleUnionArea(rectangles) {
+export function rectangleUnionArea(rectangles) {
   if (!rectangles.length) return 0;
   const edges = [...new Set(rectangles.flatMap((r) => [r.x1, r.x2]))].sort(
     (a, b) => a - b,

@@ -7,6 +7,7 @@
  */
 
 import { WORKSPACE } from "./workspace.js";
+import { rectangleUnionArea } from "./stacking.js";
 
 let renderNumber = 0;
 const VIEWBOX_WIDTH = 1000;
@@ -326,9 +327,7 @@ function faceLabel(
   </g>`;
 }
 
-// The clipping boundary and selection outline share one physical envelope.
-// Selection is painted separately, after the scene, so adjacent/upper cases
-// cannot erase an edge of the selected volume.
+// Artwork clipping and selection visibility share one physical envelope.
 function boxEnvelope(box, view) {
   const { x, y, z, length, width, height } = box;
   const top = z + height;
@@ -356,8 +355,68 @@ function boxEnvelope(box, view) {
   ];
 }
 
-function drawSelection(box, drawing, view, prefix) {
-  if (!box) return "";
+function drawSelection(orderedItems, selectedId, drawing, view, prefix) {
+  const selectedIndex = orderedItems.findIndex((box) => box.id === selectedId);
+  if (selectedIndex < 0) return "";
+  const box = orderedItems[selectedIndex];
+  const occluders = orderedItems.slice(selectedIndex + 1);
+  const selectedHull = boxEnvelope(box, view).map((point) =>
+    drawing.project(...point),
+  );
+  // Coincident mask boundaries can leave a faint antialias fringe. Suppress
+  // the entire highlight when a foreground convex silhouette contains it.
+  let fullyCovered = occluders.some((occluder) => {
+    const hull = boxEnvelope(occluder, view).map((point) =>
+      drawing.project(...point),
+    );
+    return selectedHull.every((point) => {
+      const sides = hull.map((start, index) => {
+        const end = hull[(index + 1) % hull.length];
+        return (
+          (end.x - start.x) * (point.y - start.y) -
+          (end.y - start.y) * (point.x - start.x)
+        );
+      });
+      return (
+        sides.every((side) => side >= -1e-6) ||
+        sides.every((side) => side <= 1e-6)
+      );
+    });
+  });
+  if (!fullyCovered && view !== "iso") {
+    // Flat views project to rectangles. Multiple columns can jointly cover a
+    // base, so check their union too; summing overlaps would hide exposed gaps.
+    const rect = (item) => ({
+      x1: item.x,
+      x2: item.x + item.length,
+      y1: view === "top" ? item.y : item.z,
+      y2: view === "top" ? item.y + item.width : item.z + item.height,
+    });
+    const target = rect(box);
+    const overlaps = occluders
+      .map(rect)
+      .map((other) => ({
+        x1: Math.max(target.x1, other.x1),
+        x2: Math.min(target.x2, other.x2),
+        y1: Math.max(target.y1, other.y1),
+        y2: Math.min(target.y2, other.y2),
+      }))
+      .filter((overlap) => overlap.x2 > overlap.x1 && overlap.y2 > overlap.y1);
+    const area = (target.x2 - target.x1) * (target.y2 - target.y1);
+    fullyCovered = area - rectangleUnionArea(overlaps) < 1e-6;
+  }
+  const maskId = `${prefix}-selection-visible`;
+  // Keep the stroke inside the selected silhouette, then subtract the envelopes
+  // of cases painted in front of it. Using solid envelopes prevents highlights
+  // from leaking through gaps between a neighbor's illustrated panels/rails.
+  // Clipping inward also hides the outline of a completely covered case in
+  // front/top views, even when its silhouette exactly matches its occluder.
+  const visibility = `<defs><mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="${VIEWBOX_WIDTH}" height="${VIEWBOX_HEIGHT}" style="mask-type:luminance">
+    ${drawing.polygon(boxEnvelope(box, view), "#fff")}
+    ${occluders
+      .map((occluder) => drawing.polygon(boxEnvelope(occluder, view), "#000"))
+      .join("")}
+  </mask></defs>`;
   const stroke = 'stroke="#008ed2" stroke-width="2" stroke-linejoin="round"';
   let faceEdges = "";
   if (view === "iso") {
@@ -376,8 +435,8 @@ function drawSelection(box, drawing, view, prefix) {
       )
       .join("");
   }
-  return `<g class="scene-selection" data-selected-box-id="${escape(box.id)}" pointer-events="none" aria-hidden="true">
-    ${drawing.polygon(boxEnvelope(box, view), "none", `class="box-selection" ${stroke} filter="url(#${prefix}-selection)"`)}${faceEdges}
+  return `<g class="scene-selection" data-selected-box-id="${escape(box.id)}" pointer-events="none" aria-hidden="true" mask="url(#${maskId})"${fullyCovered ? ' opacity="0"' : ""}>
+    ${visibility}${drawing.polygon(boxEnvelope(box, view), "none", `class="box-selection" ${stroke} filter="url(#${prefix}-selection)"`)}${faceEdges}
   </g>`;
 }
 
@@ -854,7 +913,8 @@ export function renderScene(boxes, catalog, options = {}) {
   const transform = getSceneTransform(boxes, catalog, settings.view, settings);
   const drawing = createDrawing(transform, prefix);
   const items = itemsWithModels(boxes, catalog);
-  const artwork = orderForDrawing(items, settings.view)
+  const orderedItems = orderForDrawing(items, settings.view);
+  const artwork = orderedItems
     .map((box) => drawBox(box, drawing, settings, transform.scale, prefix))
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" class="stack-scene" viewBox="0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}" width="100%" height="100%" aria-label="Interactive aluminum case stack planner" style="display:block;overflow:visible;touch-action:none" data-view="${escape(settings.view)}">
@@ -864,7 +924,8 @@ export function renderScene(boxes, catalog, options = {}) {
     ${settings.soccerScale ? drawSoccerScale(items, transform, settings.view, settings.units, prefix) : ""}
     ${settings.dimensions ? drawDimensions(items, drawing, settings.selectedId, settings.view, settings.units) : ""}
     ${drawSelection(
-      items.find((box) => box.id === settings.selectedId),
+      orderedItems,
+      settings.selectedId,
       drawing,
       settings.view,
       prefix,

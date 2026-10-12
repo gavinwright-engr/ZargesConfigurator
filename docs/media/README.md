@@ -5,7 +5,8 @@ These files show the actual app, not design mockups. Screenshots are produced by
 enlarged right-stack detail and checks label placement on all catalog models.
 `scripts/workspace-check.mjs` captures `front-placement.png` after a real catalog
 drag into the newly available floor space in front of the reference stacks.
-`scripts/selection-check.mjs` checks the rendered pixels of every selection edge
+`scripts/selection-check.mjs` checks that visible selection edges are highlighted
+and covered edges stay hidden in all three views
 and captures the selected middle-right case in `selection-detail.png`.
 The video records `scripts/record-demo.mjs`. `npm run test:browser` runs these
 alongside clipboard and bounded-placement browser regressions.

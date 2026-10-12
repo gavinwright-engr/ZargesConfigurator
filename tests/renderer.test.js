@@ -124,7 +124,7 @@ test("pointer inversion matches both human-scale camera settings", () => {
   }
 });
 
-test("selection outlines the full case envelope above neighboring artwork in every view", () => {
+test("selection uses the case envelope and masks foreground cases in every view", () => {
   for (const view of ["iso", "front", "top"]) {
     for (const selectedId of PRESET.map((box) => box.id)) {
       const svg = renderScene(PRESET, CATALOG, {
@@ -136,9 +136,25 @@ test("selection outlines the full case envelope above neighboring artwork in eve
       const overlay = svg.match(/<g class="scene-selection"[\s\S]*?<\/g>/)?.[0];
       assert(overlay);
       assert.match(overlay, /pointer-events="none" aria-hidden="true"/);
+      assert.match(overlay, /mask="url\(#zarges-\d+-selection-visible\)"/);
       assert.match(svg, /<g class="scene-selection"[\s\S]*<\/g>\s*<\/svg>$/);
-      const selectionPoints = overlay.match(/points="([^"]+)"/)[1];
+      const selectionPoints = overlay.match(
+        /points="([^"]+)" fill="none" class="box-selection"/,
+      )[1];
       assert.equal(selectionPoints, firstPolygon(svg, selectedId));
+      const mask = overlay.match(/<mask [\s\S]*?<\/mask>/)[0];
+      const visibleArea = mask.match(/points="([^"]+)" fill="#fff"/)[1];
+      assert.equal(visibleArea, selectionPoints);
+      const occluders = [...mask.matchAll(/points="([^"]+)" fill="#000"/g)].map(
+        (match) => match[1],
+      );
+      const order = drawOrder(svg);
+      assert.deepEqual(
+        occluders,
+        order
+          .slice(order.indexOf(selectedId) + 1)
+          .map((id) => firstPolygon(svg, id)),
+      );
       assert.equal((svg.match(/class="box-selection"/g) || []).length, 1);
       assert.equal(
         (overlay.match(/class="box-selection-edge"/g) || []).length,
