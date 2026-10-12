@@ -6,10 +6,13 @@
  * The artwork is intentionally an illustration, not a mechanical/CAD model.
  */
 
+import { WORKSPACE } from "./workspace.js";
+
 let renderNumber = 0;
 const VIEWBOX_WIDTH = 1000;
 const VIEWBOX_HEIGHT = 680;
 const HUMAN_HEIGHT_MM = 1828.8;
+const SOCCER_DIAMETER_MM = 220;
 const escape = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -70,6 +73,11 @@ function humanPosition(items) {
         : 1200) + 650,
     y: items.length ? Math.min(...items.map((item) => item.y)) : 0,
   };
+}
+
+function soccerPosition(items) {
+  const person = humanPosition(items);
+  return { x: person.x + 500, y: person.y + 120 };
 }
 
 /**
@@ -157,10 +165,16 @@ export function getSceneTransform(boxes, catalog, view = "iso", options = {}) {
   });
   const points = [];
   for (const box of items) {
-    for (const x of [box.x - 8, box.x + box.length + 8]) {
-      for (const y of [box.y - 8, box.y + box.width + 8]) {
-        for (const z of [box.z, box.z + box.height + 12])
-          points.push(raw(x, y, z));
+    for (const x of [box.x, box.x + box.length]) {
+      for (const y of [box.y, box.y + box.width]) {
+        for (const z of [box.z, box.z + box.height]) points.push(raw(x, y, z));
+      }
+    }
+  }
+  if (options.workspace !== false) {
+    for (const x of [WORKSPACE.x, WORKSPACE.x + WORKSPACE.length]) {
+      for (const y of [WORKSPACE.y, WORKSPACE.y + WORKSPACE.width]) {
+        points.push(raw(x, y, 0));
       }
     }
   }
@@ -176,6 +190,15 @@ export function getSceneTransform(boxes, catalog, view = "iso", options = {}) {
         y: base.y - (view === "top" ? 300 : HUMAN_HEIGHT_MM + 60),
       },
       { x: base.x + 700, y: base.y + (view === "top" ? 300 : 110) },
+    );
+  }
+  if (options.soccerScale) {
+    const ball = soccerPosition(items);
+    const center = raw(ball.x, ball.y, SOCCER_DIAMETER_MM / 2);
+    const radius = SOCCER_DIAMETER_MM / 2;
+    points.push(
+      { x: center.x - radius - 70, y: center.y - radius },
+      { x: center.x + radius + 70, y: center.y + radius + 140 },
     );
   }
   const minX = Math.min(...points.map((point) => point.x));
@@ -233,6 +256,9 @@ function definitions(prefix) {
       <stop stop-color="#8999a3"/><stop offset=".22" stop-color="#ecf0f1"/>
       <stop offset=".58" stop-color="#ced6db"/><stop offset="1" stop-color="#7e8f99"/>
     </linearGradient>
+    <radialGradient id="${prefix}-soccer" cx=".3" cy=".25" r=".8">
+      <stop stop-color="#fff"/><stop offset=".65" stop-color="#f0f3f5"/><stop offset="1" stop-color="#c8d1d7"/>
+    </radialGradient>
     <pattern id="${prefix}-grain" width="3" height="3" patternUnits="userSpaceOnUse">
       <path d="M0 1.5H3" stroke="#fff" stroke-width=".35" opacity=".18"/>
     </pattern>
@@ -265,10 +291,50 @@ function createDrawing(transform, prefix) {
   return { project, points, polygon, line, paint };
 }
 
+/** Build a label in front-face millimetres, then project the entire label. */
+function faceLabel(
+  box,
+  drawing,
+  localX,
+  elevation,
+  width,
+  height,
+  className,
+  text,
+  fontSize,
+  fill,
+  textFill,
+) {
+  const origin = drawing.project(box.x + localX, box.y + 5, box.z + elevation);
+  const right = drawing.project(
+    box.x + localX + 1,
+    box.y + 5,
+    box.z + elevation,
+  );
+  const down = drawing.project(
+    box.x + localX,
+    box.y + 5,
+    box.z + elevation - 1,
+  );
+  const matrix = [
+    right.x - origin.x,
+    right.y - origin.y,
+    down.x - origin.x,
+    down.y - origin.y,
+    origin.x,
+    origin.y,
+  ].join(" ");
+  return `<g class="${className}" transform="matrix(${matrix})" pointer-events="none">
+    <rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" rx="${Math.min(12, height * 0.12)}" fill="${fill}"/>
+    <text text-anchor="middle" y="${fontSize * 0.34}" font-family="Inter,Arial,sans-serif" font-size="${fontSize}" font-weight="600" fill="${textFill}">${escape(text)}</text>
+  </g>`;
+}
+
 function drawBox(box, drawing, options, scale, prefix) {
-  const { x, y, z, length: length, width: width, height: height, model } = box;
+  const { x, y, z, length, width, height, model } = box;
   const { polygon, line, paint, project } = drawing;
   const top = z + height;
+  const lidHeight = top - 12;
   const seam = top - Math.min(47, height * 0.2);
   const stroke = 'stroke="#929fa8" stroke-width=".8" stroke-linejoin="round"';
   const front = (left, right, bottom, upper, depth = y) => [
@@ -283,62 +349,81 @@ function drawBox(box, drawing, options, scale, prefix) {
     [horizontal, far, upper],
     [horizontal, near, upper],
   ];
-  const lid = (inset = 0, level = top) => [
+  const lid = (inset = 0, level = lidHeight) => [
     [x + inset, y + inset, level],
     [x + length - inset, y + inset, level],
     [x + length - inset, y + width - inset, level],
     [x + inset, y + width - inset, level],
   ];
+  const envelope =
+    options.view === "top"
+      ? lid(0, top)
+      : options.view === "front"
+        ? front(x, x + length, z, top)
+        : [
+            [x, y + width, top],
+            [x + length, y + width, top],
+            [x + length, y, top],
+            [x + length, y, z],
+            [x, y, z],
+            [x, y + width, z],
+          ];
+  const clipId = `${prefix}-envelope-${String(box.id).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
   let art = "";
+  let capacity = "";
 
+  // Published outside dimensions include rails and corners. The panel is
+  // recessed; the hardware stays inside the same envelope used for stacking.
   if (options.view !== "top") {
-    art += polygon(side(y, y + width, z + 8, top), paint("side"), stroke);
-    art += polygon(front(x, x + length, z + 8, top), paint("front"), stroke);
     art += polygon(
-      front(x + 4, x + length - 4, z + 14, seam - 6),
+      side(y + 5, y + width - 5, z + 10, lidHeight, x + 5),
+      paint("side"),
+      stroke,
+    );
+    art += polygon(
+      front(x + 5, x + length - 5, z + 10, lidHeight, y + 5),
+      paint("front"),
+      `${stroke} class="box-front"`,
+    );
+    art += polygon(
+      front(x + 6, x + length - 6, z + 14, seam - 6, y + 5),
       paint("grain"),
     );
 
-    // Extruded perimeter rails: separate top, front and side surfaces give a
-    // recognisable aluminum profile even at the small catalogue scale.
     for (const [railZ, railHeight] of [
-      [z + 9, 12],
-      [seam, 9],
-      [top - 3, 9],
+      [z, 12],
+      [seam, 8],
+      [top - 20, 8],
     ]) {
       art += polygon(
-        front(x - 5, x + length + 5, railZ, railZ + railHeight, y - 5),
+        side(y, y + width, railZ, railZ + railHeight),
         paint("rail"),
         stroke,
       );
       art += polygon(
-        side(y - 5, y + width + 5, railZ, railZ + railHeight, x - 5),
+        front(x, x + length, railZ, railZ + railHeight),
         paint("rail"),
         stroke,
       );
       art += line(
-        [x - 5, y - 5, railZ + railHeight],
-        [x + length + 5, y - 5, railZ + railHeight],
+        [x, y, railZ + railHeight],
+        [x + length, y, railZ + railHeight],
         'stroke="#fff" stroke-width="1" opacity=".8"',
       );
     }
-
-    // Subtle panel breaks and the vertical reinforced corners.
     for (const cornerX of [x + 10, x + length - 10]) {
       art += line(
-        [cornerX, y - 1, z + 25],
-        [cornerX, y - 1, seam - 5],
+        [cornerX, y + 4, z + 18],
+        [cornerX, y + 4, seam - 5],
         'stroke="#adb8bf" stroke-width="1.1"',
       );
       art += line(
-        [cornerX + 3, y - 1, z + 25],
-        [cornerX + 3, y - 1, seam - 5],
+        [cornerX + 3, y + 4, z + 18],
+        [cornerX + 3, y + 4, seam - 5],
         'stroke="#f5f7f8" stroke-width=".65" opacity=".8"',
       );
     }
-
     if (options.view !== "front") {
-      // Spring handle mounted on the short side, with an inset dark grip.
       const handleZ = top - Math.min(101, height * 0.52);
       art += polygon(
         side(
@@ -346,7 +431,7 @@ function drawBox(box, drawing, options, scale, prefix) {
           y + width * 0.62,
           handleZ - 15,
           handleZ + 24,
-          x - 2,
+          x + 2,
         ),
         paint("hardware"),
         'stroke="#8999a3" stroke-width=".7"',
@@ -357,167 +442,215 @@ function drawBox(box, drawing, options, scale, prefix) {
           y + width * 0.6,
           handleZ - 6,
           handleZ + 13,
-          x - 3,
+          x + 1,
         ),
         "#a4b0b7",
         'stroke="#eef2f4" stroke-width="1"',
       );
       art += line(
-        [x - 5, y + width * 0.42, handleZ + 3],
-        [x - 5, y + width * 0.58, handleZ + 3],
+        [x, y + width * 0.42, handleZ + 3],
+        [x, y + width * 0.58, handleZ + 3],
         'stroke="#dce2e6" stroke-width="2.2"',
       );
     }
-
-    // Two toggle catches are deliberately constructed in world coordinates so
-    // their size remains the same on every case, regardless of capacity.
     for (const ratio of [0.23, 0.77]) {
       const latchX = x + length * ratio;
       const latchZ = seam - 15;
       art += polygon(
-        front(latchX - 12, latchX + 12, latchZ - 25, latchZ + 24, y - 7),
+        front(latchX - 12, latchX + 12, latchZ - 25, latchZ + 24, y + 2),
         "#9ba9b2",
         'stroke="#798994" stroke-width=".7"',
       );
       art += polygon(
-        front(latchX - 8, latchX + 8, latchZ - 21, latchZ + 21, y - 9),
+        front(latchX - 8, latchX + 8, latchZ - 21, latchZ + 21, y + 1),
         paint("hardware"),
         'stroke="#eaf0f3" stroke-width=".8"',
       );
       art += line(
-        [latchX - 6, y - 10, latchZ + 12],
-        [latchX + 6, y - 10, latchZ + 12],
+        [latchX - 6, y, latchZ + 12],
+        [latchX + 6, y, latchZ + 12],
         'stroke="#7f909b" stroke-width=".8"',
       );
       art += line(
-        [latchX - 5, y - 10, latchZ - 16],
-        [latchX + 5, y - 10, latchZ - 16],
+        [latchX - 5, y, latchZ - 16],
+        [latchX + 5, y, latchZ - 16],
         'stroke="#6f828f" stroke-width="1"',
       );
     }
 
-    const badge = project(
-      x + length * 0.5,
-      y - 7,
-      top - Math.min(91, height * 0.44),
+    // Labels share the panel's affine projection. Their bounds are calculated
+    // in millimetres, so a wide/rotated/shallow case cannot spill into a neighbour.
+    const label = model.label || `${model.volume} L`;
+    const panelLow = 24;
+    const panelHigh = seam - z - 14;
+    const panelHeight = panelHigh - panelLow;
+    const targetFont = Math.max(13, Math.min(22, length * scale * 0.07));
+    const font = Math.min(
+      targetFont / scale,
+      panelHeight / 1.7,
+      (length - 52) / (label.length * 0.6 + 1.5),
     );
-    const badgeWidth = Math.max(24, Math.min(48, length * scale * 0.13));
-    art += `<g transform="translate(${number(badge.x)} ${number(badge.y)}) rotate(-3.2)">
-      <rect x="${-badgeWidth / 2}" y="-5.5" width="${badgeWidth}" height="11" rx=".8" fill="#174374"/>
-      <text text-anchor="middle" y="2.5" font-family="Arial,sans-serif" font-weight="800" font-size="${number(badgeWidth * 0.16)}" letter-spacing=".5" fill="#fff">ZARGES</text>
-    </g>`;
+    const labelWidth = font * (label.length * 0.6 + 1.5);
+    const labelHeight = font * 1.52;
+    const badgeWidth = Math.min(95, length * 0.19);
+    const badgeHeight = 24;
+    // Extra clearance also separates their axis-aligned screen bounds after
+    // the face's shear; this matters in close-up inspection and hit testing.
+    const gap = Math.max(
+      12,
+      (options.view === "iso" ? (0.055 * (labelWidth + badgeWidth)) / 2 : 0) +
+        3 / scale,
+    );
+    const showBadge =
+      options.labels === false ||
+      panelHeight >= labelHeight + badgeHeight + gap + 16;
+    const combinedHeight = labelHeight + (showBadge ? badgeHeight + gap : 0);
+    const capacityZ =
+      panelLow + (panelHeight - combinedHeight) / 2 + labelHeight / 2;
+    if (showBadge) {
+      const badgeZ =
+        options.labels === false
+          ? Math.min(panelHigh - badgeHeight / 2, height * 0.61)
+          : capacityZ + labelHeight / 2 + gap + badgeHeight / 2;
+      art += faceLabel(
+        box,
+        drawing,
+        length / 2,
+        badgeZ,
+        badgeWidth,
+        badgeHeight,
+        "box-badge",
+        "ZARGES",
+        badgeWidth * 0.15,
+        "#174374",
+        "#fff",
+      );
+    }
+    if (options.labels !== false) {
+      capacity = faceLabel(
+        box,
+        drawing,
+        length / 2,
+        capacityZ,
+        labelWidth,
+        labelHeight,
+        "box-capacity",
+        label,
+        font,
+        "#142936",
+        "#fff",
+      );
+    }
   }
 
-  // The lid is added after the body, but below the corner castings.
-  art += polygon(lid(-5, top + 6), paint("lid"), stroke);
-  art += polygon(
-    lid(17, top + 7),
-    "none",
-    'stroke="#b5c0c7" stroke-width=".8"',
-  );
+  // The lid is recessed below the stacking corners. The highest point of a
+  // casting is exactly z+height, and the lowest rail begins exactly at z.
+  art += polygon(lid(), paint("lid"), stroke);
+  art += polygon(lid(17), "none", 'stroke="#b5c0c7" stroke-width=".8"');
   art += line(
-    [x + 19, y + 19, top + 8],
-    [x + length - 19, y + 19, top + 8],
+    [x + 19, y + 19, lidHeight],
+    [x + length - 19, y + 19, lidHeight],
     'stroke="#fff" stroke-width="1" opacity=".8"',
   );
-
-  // Cast stacking corners. These are visual guides only; compatibility is
-  // deliberately evaluated in the separate geometry/stacking module.
-  for (const cornerX of [x + 4, x + length - 37]) {
-    for (const cornerY of [y + 4, y + width - 37]) {
-      const vertices = [
-        [cornerX, cornerY, top + 17],
-        [cornerX + 32, cornerY, top + 17],
-        [cornerX + 32, cornerY + 32, top + 17],
-        [cornerX, cornerY + 32, top + 17],
-      ];
+  for (const cornerX of [x + 4, x + length - 36]) {
+    for (const cornerY of [y + 4, y + width - 36]) {
       art += polygon(
         [
-          [cornerX, cornerY, top + 5],
-          [cornerX + 32, cornerY, top + 5],
-          [cornerX + 32, cornerY, top + 17],
-          [cornerX, cornerY, top + 17],
+          [cornerX, cornerY, lidHeight],
+          [cornerX + 32, cornerY, lidHeight],
+          [cornerX + 32, cornerY, top],
+          [cornerX, cornerY, top],
         ],
         "#90a6b4",
         'stroke="#748e9f" stroke-width=".45"',
       );
       art += polygon(
         [
-          [cornerX, cornerY, top + 5],
-          [cornerX, cornerY + 32, top + 5],
-          [cornerX, cornerY + 32, top + 17],
-          [cornerX, cornerY, top + 17],
+          [cornerX, cornerY, lidHeight],
+          [cornerX, cornerY + 32, lidHeight],
+          [cornerX, cornerY + 32, top],
+          [cornerX, cornerY, top],
         ],
         "#a5b7c2",
         'stroke="#8299a8" stroke-width=".45"',
       );
       art += polygon(
-        vertices,
+        [
+          [cornerX, cornerY, top],
+          [cornerX + 32, cornerY, top],
+          [cornerX + 32, cornerY + 32, top],
+          [cornerX, cornerY + 32, top],
+        ],
         "#c6d3db",
         'stroke="#eff4f7" stroke-width=".65"',
       );
     }
   }
-
-  if (options.selectedId === box.id) {
-    const outline =
-      options.view === "top"
-        ? lid(-8, top + 19)
-        : [
-            [x - 8, y + width + 8, top + 12],
-            [x + length + 8, y + width + 8, top + 12],
-            [x + length + 8, y - 8, top + 12],
-            [x + length + 8, y - 8, z + 2],
-            [x - 8, y - 8, z + 2],
-            [x - 8, y + width + 8, z + 2],
-          ];
-    art += polygon(
-      outline,
-      "none",
-      `stroke="#008ed2" stroke-width="2" stroke-linejoin="round" filter="url(#${prefix}-selection)"`,
+  if (options.labels !== false && options.view === "top") {
+    const label = model.label || `${model.volume} L`;
+    const font = Math.min(
+      22 / scale,
+      Math.max(14 / scale, length * 0.085),
+      (length * 0.82) / (label.length * 0.6 + 1.5),
+      (width * 0.82) / 1.52,
     );
-  }
-
-  if (options.labels !== false) {
-    const location =
-      options.view === "top"
-        ? project(x + length / 2, y + width / 2, top)
-        : project(
-            x + length / 2,
-            y - 8,
-            z + Math.min(height * 0.35, height - 120),
-          );
-    const label = `${model.volume} L${/long/i.test(`${model.label || ""} ${model.name || ""} ${model.id}`) ? " long" : ""}`;
-    const fontSize = options.thumbnail
-      ? 18
-      : Math.max(14, Math.min(22, length * scale * 0.085));
-    const labelWidth = label.length * fontSize * 0.56 + 22;
-    art += `<g class="box-capacity" transform="translate(${number(location.x)} ${number(location.y)})" pointer-events="none">
-      <rect x="${number(-labelWidth / 2)}" y="${number(-fontSize * 0.77)}" width="${number(labelWidth)}" height="${number(fontSize * 1.52)}" rx="4" fill="#142936" fill-opacity=".91"/>
-      <text y="${number(fontSize * 0.34)}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="${number(fontSize)}" font-weight="550" letter-spacing="-.5" fill="#fff">${escape(label)}</text>
+    const labelWidth = font * (label.length * 0.6 + 1.5);
+    const labelHeight = font * 1.52;
+    const center = project(x + length / 2, y + width / 2, top);
+    capacity = `<g class="box-capacity" transform="translate(${center.x} ${center.y}) scale(${scale})" pointer-events="none">
+      <rect x="${-labelWidth / 2}" y="${-labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="${font * 0.2}" fill="#142936"/>
+      <text text-anchor="middle" y="${font * 0.34}" font-family="Inter,Arial,sans-serif" font-size="${font}" font-weight="600" fill="#fff">${escape(label)}</text>
     </g>`;
   }
-
+  const selection =
+    options.selectedId === box.id
+      ? polygon(
+          envelope,
+          "none",
+          `class="box-selection" pointer-events="none" stroke="#008ed2" stroke-width="2" stroke-linejoin="round" filter="url(#${prefix}-selection)"`,
+        )
+      : "";
   return `<g class="case-object${options.selectedId === box.id ? " is-selected" : ""}" data-box-id="${escape(box.id)}" role="button" tabindex="0" aria-label="${escape(`${model.volume} litre ${model.name || "case"}, ${length} by ${width} by ${height} millimetres`)}" style="cursor:grab">
-    <title>${escape(`${model.name || model.id} · ${model.volume} L · ${length} × ${width} × ${height} mm`)}</title>${art}</g>`;
+    <title>${escape(`${model.name || model.id} · ${model.volume} L · ${length} × ${width} × ${height} mm`)}</title>
+    <defs><clipPath id="${clipId}">${polygon(envelope, "#fff", 'class="box-envelope"')}</clipPath></defs>
+    <g class="box-art" clip-path="url(#${clipId})">${art}</g>${selection}${capacity}
+  </g>`;
 }
 
-function drawFloor(items, drawing, prefix, view) {
-  if (!items.length) return "";
+function drawFloor(items, drawing, prefix, options) {
+  const { view } = options;
+  const bounded = options.workspace !== false;
+  if (!items.length && !bounded) return "";
   const { polygon, line } = drawing;
-  const minX =
-    Math.floor((Math.min(...items.map((item) => item.x)) - 200) / 200) * 200;
-  const maxX =
-    Math.ceil(
-      (Math.max(...items.map((item) => item.x + item.length)) + 200) / 200,
-    ) * 200;
-  const minY =
-    Math.floor((Math.min(...items.map((item) => item.y)) - 180) / 200) * 200;
-  const maxY =
-    Math.ceil(
-      (Math.max(...items.map((item) => item.y + item.width)) + 350) / 200,
-    ) * 200;
+  const minX = bounded
+    ? WORKSPACE.x
+    : Math.floor((Math.min(...items.map((item) => item.x)) - 200) / 200) * 200;
+  const maxX = bounded
+    ? WORKSPACE.x + WORKSPACE.length
+    : Math.ceil(
+        (Math.max(...items.map((item) => item.x + item.length)) + 200) / 200,
+      ) * 200;
+  const minY = bounded
+    ? WORKSPACE.y
+    : Math.floor((Math.min(...items.map((item) => item.y)) - 180) / 200) * 200;
+  const maxY = bounded
+    ? WORKSPACE.y + WORKSPACE.width
+    : Math.ceil(
+        (Math.max(...items.map((item) => item.y + item.width)) + 350) / 200,
+      ) * 200;
   let art = '<g class="scene-floor" pointer-events="none">';
+  if (bounded && view !== "front") {
+    art += polygon(
+      [
+        [minX, minY, 0],
+        [maxX, minY, 0],
+        [maxX, maxY, 0],
+        [minX, maxY, 0],
+      ],
+      "#eaf1f6",
+      `class="workspace-boundary" data-workspace-length-mm="${WORKSPACE.length}" data-workspace-width-mm="${WORKSPACE.width}" fill-opacity=".38" stroke="#86a5bb" stroke-width="1" stroke-dasharray="6 5" stroke-opacity=".65"`,
+    );
+  }
   if (view !== "front") {
     for (let x = minX; x <= maxX; x += 200)
       art += line(
@@ -588,6 +721,33 @@ function drawHumanScale(items, transform, view, units) {
   </g>`;
 }
 
+/** Original vector soccer ball: a size-five, 220 mm diameter scale reference. */
+function drawSoccerScale(items, transform, view, units, prefix) {
+  const position = soccerPosition(items);
+  const radius = SOCCER_DIAMETER_MM / 2;
+  const center = transform.project(position.x, position.y, radius);
+  const ground = transform.project(position.x, position.y, 0);
+  const scale = transform.scale;
+  const panels = Array.from(
+    { length: 5 },
+    (_, index) => `<g transform="rotate(${index * 72})">
+    <path d="M-28 -94L-17 -120H17L28 -94L0 -76Z" fill="#243643"/>
+    <path d="M0 -43V-76M-28 -94L-72 -72" fill="none" stroke="#738490" stroke-width="2"/>
+  </g>`,
+  ).join("");
+  return `<g class="soccer-scale" data-soccer-diameter-mm="220" pointer-events="none" aria-label="Soccer ball, 220 millimetres in diameter">
+    <ellipse cx="${ground.x}" cy="${ground.y + 2}" rx="${radius * scale}" ry="${32 * scale}" fill="#617887" opacity=".16"/>
+    <g class="soccer-figure" transform="translate(${center.x} ${center.y}) scale(${scale})">
+      <defs><clipPath id="${prefix}-soccer-clip"><circle r="110"/></clipPath></defs>
+      <circle class="soccer-outline" r="110" fill="url(#${prefix}-soccer)" stroke="#708491" stroke-width="2"/>
+      <g clip-path="url(#${prefix}-soccer-clip)">
+        ${panels}<path d="M0 -43L40.9 -13.3L25.3 34.8H-25.3L-40.9 -13.3Z" fill="#243643"/>
+      </g>
+    </g>
+    <text x="${center.x}" y="${center.y + radius * scale + 17}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="9" fill="#758997">${units === "in" ? "Ø 8.7 in" : "Ø 220 mm"}</text>
+  </g>`;
+}
+
 function drawDimensions(items, drawing, selectedId, view, units = "mm") {
   if (!items.length) return "";
   const { project, line } = drawing;
@@ -653,6 +813,8 @@ export function renderScene(boxes, catalog, options = {}) {
     dimensions: false,
     units: "mm",
     humanScale: true,
+    soccerScale: false,
+    workspace: true,
     ...options,
   };
   const prefix = `zarges-${++renderNumber}`;
@@ -663,9 +825,10 @@ export function renderScene(boxes, catalog, options = {}) {
     .map((box) => drawBox(box, drawing, settings, transform.scale, prefix))
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" class="stack-scene" viewBox="0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}" width="100%" height="100%" aria-label="Interactive aluminum case stack planner" style="display:block;overflow:visible;touch-action:none" data-view="${escape(settings.view)}">
-    ${definitions(prefix)}${drawFloor(items, drawing, prefix, settings.view)}
+    ${definitions(prefix)}${drawFloor(items, drawing, prefix, settings)}
     <g class="scene-boxes">${artwork}</g>
     ${settings.humanScale ? drawHumanScale(items, transform, settings.view, settings.units) : ""}
+    ${settings.soccerScale ? drawSoccerScale(items, transform, settings.view, settings.units, prefix) : ""}
     ${settings.dimensions ? drawDimensions(items, drawing, settings.selectedId, settings.view, settings.units) : ""}
   </svg>`;
 }
@@ -752,6 +915,8 @@ export function renderBoxThumbnail(model) {
       labels: false,
       thumbnail: true,
       humanScale: false,
+      soccerScale: false,
+      workspace: false,
     },
   )
     .replace('class="stack-scene"', 'class="box-thumbnail" aria-hidden="true"')

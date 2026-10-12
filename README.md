@@ -14,7 +14,7 @@ An independent, open-source product concept by Gavin Wright. Not affiliated with
 
 [![Animated demo: inspect dimensions, drag a case onto a stack, and export the box list](docs/media/demo.gif)](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
 
-The video records the actual application: selection, dimensions, camera views, drag-and-drop stacking, reference reset, CSV export, and fit information. [Reproduce the screenshots and recording](docs/media/README.md).
+The video records the actual application: selection, copy/paste, scale references, dimensions, camera views, drag-and-drop stacking, reference reset, CSV export, and fit information. [Reproduce the screenshots and recording](docs/media/README.md).
 
 ## Run it
 
@@ -32,13 +32,17 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 
 - **Build a stack:** drag from the catalog, or add a case with + and move it in the workspace. Edges snap; overlapping and unsupported placements are rejected.
 - **Explore the full catalog:** browse or search all 25 standard K 470 sizes, or filter to the six models in the reference arrangement. The catalog scrolls independently of the workspace.
-- **Place precisely:** select a case to rotate, duplicate, remove, or move it in 10 mm steps. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
+- **Place precisely:** select a case to rotate, remove, or move it in 10 mm steps. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
+- **Copy and paste:** select a case and use **Ctrl/Cmd+C**, then **Ctrl/Cmd+V**, or the **Copy** and **Paste** buttons. Each copy keeps its model and rotation and appears in a nearby clear floor spot. Pasting is undoable; text fields retain normal text editing.
+- **Keep cases together:** the visible work area is **4.5 × 2.4 m**, with a **3 m** height limit. Gaps between neighboring stacks can be at most **60 cm**. Distant drops stay in their original position; new cases wrap into nearby rows. These are planner settings, not manufacturer limits.
 - **Compare sizes:** switch between perspective, front, and top views; show dimensions; toggle millimeters/inches. The model always retains millimeter precision.
-- **Get a sense of scale:** show or hide the 6-foot person. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
+- **Get a sense of scale:** independently toggle the **6-foot person** and a **22 cm soccer ball**. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
 - **Keep your work:** automatic device-local saving, undo/redo, JSON import/export, and a URL that restores the configuration.
 - **Prepare an order discussion:** export a CSV grouped by manufacturer model, quantity, capacity, dimensions, empty mass, and official product link.
 
-Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow keys move 10 mm; **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** redoes. Move upper cases before moving or removing their supports. The surface selector provides stacking without dragging.
+Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow keys move 10 mm; **Ctrl/Cmd+C / V** copies / pastes; **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** redoes. Move upper cases before moving or removing their supports. The surface selector provides stacking without dragging.
+
+![Close-up of the mixed-height right stack, with hardware inside each case envelope and separate capacity and product labels](docs/media/stack-detail.png)
 
 ![Top view with footprint dimensions](docs/media/top-view.png)
 
@@ -79,6 +83,8 @@ index.html                 Accessible app shell
 src/
   catalog.js               Sourced product data and the reference arrangement
   stacking.js              Pure geometry, snapping, collision and support checks
+  workspace.js             Bounded stage, nearby floor placement and old-plan repair
+  clipboard.js             Validated model/rotation clipboard format
   renderer.js              SVG aluminum cases, projections and drag previews
   plans.js                 Validated plan format, sharing and CSV export
   app.js                   Interaction, undo/redo, storage and interface updates
@@ -106,7 +112,7 @@ npm start                  # Keep running in one terminal
 npm run test:browser       # In another terminal
 ```
 
-Tests cover the exact reference layout, rotated footprints, bridges, partial support, overlap, uneven supports, orphaned cases, plan validation and round trips, CSV quantities, drawing order, and the human scale reference. Browser checks exercise real pointer stacking, catalog drops into both halves of the large base, the full catalog, stable selection at multiple screen sizes, keyboard placement, search, views, units, undo/redo, downloads, imports, shared links, persistence, and mobile layout. The app loads no remote fonts, analytics, product images, or services.
+Tests cover the reference layout, support and collisions, workspace boundaries and spacing, old-plan repair, clipboard validation, plan round trips, drawing order, and physical scale references. Browser checks exercise real pointer stacking, distant-drop rejection, copy/paste shortcuts and buttons, the full catalog, stable selection, keyboard placement, downloads, imports, sharing, persistence, and mobile layout. Close-up checks inspect all 25 models in both rotations and front/3D views for label containment and overlap. The app loads no remote fonts, analytics, product images, or services.
 
 ## Publish
 

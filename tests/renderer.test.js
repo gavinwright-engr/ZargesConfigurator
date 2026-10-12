@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CATALOG, PRESET } from "../src/catalog.js";
+import { WORKSPACE } from "../src/workspace.js";
 import {
   getSceneTransform,
   renderBoxThumbnail,
@@ -119,6 +120,165 @@ test("pointer inversion matches both human-scale camera settings", () => {
       const world = transform.unproject(projected.x, projected.y, 410);
       assert(Math.abs(world.x - 1713) < 1e-8);
       assert(Math.abs(world.y - 217) < 1e-8);
+    }
+  }
+});
+
+function polygonPoints(markup) {
+  return markup
+    .match(/points="([^"]+)"/)[1]
+    .split(" ")
+    .map((point) => point.split(",").map(Number));
+}
+
+function insidePolygon(point, vertices) {
+  let sign = 0;
+  for (let index = 0; index < vertices.length; index += 1) {
+    const a = vertices[index];
+    const b = vertices[(index + 1) % vertices.length];
+    const cross =
+      (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0]);
+    if (Math.abs(cross) <= Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.03)
+      continue;
+    if (sign && Math.sign(cross) !== sign) return false;
+    sign = Math.sign(cross);
+  }
+  return true;
+}
+
+function labelCorners(markup, className) {
+  const group = markup.match(
+    new RegExp(
+      `<g class="${className}" transform="matrix\\(([^)]+)\\)"[^>]*>\\s*<rect ([^>]+)`,
+    ),
+  );
+  if (!group) return null;
+  const [a, b, c, d, e, f] = group[1].split(" ").map(Number);
+  const attribute = (name) =>
+    Number(group[2].match(new RegExp(`(?:^| )${name}="([^"]+)"`))[1]);
+  const x = attribute("x"),
+    y = attribute("y");
+  const width = attribute("width"),
+    height = attribute("height");
+  return [
+    [x, y],
+    [x + width, y],
+    [x + width, y + height],
+    [x, y + height],
+  ].map(([px, py]) => [a * px + c * py + e, b * px + d * py + f]);
+}
+
+test("every catalogue orientation keeps physical artwork and labels inside its case", () => {
+  for (const model of CATALOG) {
+    for (const rotated of [false, true]) {
+      for (const view of ["iso", "front"]) {
+        for (const workspace of [false, true]) {
+          const box = {
+            id: "fit-test",
+            modelId: model.id,
+            x: 0,
+            y: 0,
+            z: 0,
+            rotated,
+          };
+          const svg = renderScene([box], CATALOG, { view, workspace });
+          const context = `${model.id}, ${view}, rotated=${rotated}, workspace=${workspace}`;
+          const envelope = polygonPoints(
+            svg.match(/<polygon[^>]+class="box-envelope"[^>]*>/)[0],
+          );
+          const front = polygonPoints(
+            svg.match(/<polygon[^>]+class="box-front"[^>]*>/)[0],
+          );
+          const capacity = labelCorners(svg, "box-capacity");
+          assert(
+            capacity.every((point) => insidePolygon(point, front)),
+            `${context}: capacity escapes face`,
+          );
+          const physical = svg.slice(
+            svg.indexOf('<g class="box-art"'),
+            svg.indexOf('<g class="box-capacity"'),
+          );
+          for (const polygon of physical.matchAll(/<polygon[^>]+>/g)) {
+            assert(
+              polygonPoints(polygon[0]).every((point) =>
+                insidePolygon(point, envelope),
+              ),
+              `${context}: hardware escapes envelope`,
+            );
+          }
+          const badge = labelCorners(svg, "box-badge");
+          if (badge) {
+            const capacityTop = Math.min(...capacity.map((point) => point[1]));
+            const badgeBottom = Math.max(...badge.map((point) => point[1]));
+            assert(
+              badgeBottom <= capacityTop,
+              `${context}: badge collides with capacity`,
+            );
+          }
+        }
+      }
+    }
+  }
+});
+
+test("the entire bounded floor fits the shared camera and thumbnails omit it", () => {
+  for (const view of ["iso", "top"]) {
+    const transform = getSceneTransform(PRESET, CATALOG, view);
+    for (const x of [WORKSPACE.x, WORKSPACE.x + WORKSPACE.length]) {
+      for (const y of [WORKSPACE.y, WORKSPACE.y + WORKSPACE.width]) {
+        const point = transform.project(x, y, 0);
+        assert(point.x >= 0 && point.x <= transform.width);
+        assert(point.y >= 0 && point.y <= transform.height);
+      }
+    }
+    assert.match(
+      renderScene(PRESET, CATALOG, { view }),
+      /data-workspace-length-mm="4500" data-workspace-width-mm="2400"/,
+    );
+  }
+  assert.doesNotMatch(
+    renderScene(PRESET, CATALOG, { workspace: false }),
+    /class="workspace-boundary"/,
+  );
+  assert.doesNotMatch(
+    renderBoxThumbnail(CATALOG[0]),
+    /class="workspace-boundary"/,
+  );
+});
+
+test("the optional soccer ball is 220 mm in every view and camera configuration", () => {
+  assert.doesNotMatch(renderScene(PRESET, CATALOG), /data-soccer-diameter-mm/);
+  assert.doesNotMatch(
+    renderBoxThumbnail(CATALOG[0]),
+    /data-soccer-diameter-mm/,
+  );
+  for (const view of ["iso", "front", "top"]) {
+    for (const workspace of [false, true]) {
+      for (const humanScale of [false, true]) {
+        const options = { view, workspace, humanScale, soccerScale: true };
+        const svg = renderScene(PRESET, CATALOG, options);
+        const transform = getSceneTransform(PRESET, CATALOG, view, options);
+        assert.match(svg, /data-soccer-diameter-mm="220"/);
+        const radius = Number(
+          svg.match(/class="soccer-outline" r="([^"]+)"/)[1],
+        );
+        const sphereScale = Number(
+          svg.match(
+            /class="soccer-figure" transform="translate\([^)]+\) scale\(([^)]+)\)"/,
+          )[1],
+        );
+        assert(
+          Math.abs(radius * 2 * sphereScale - 220 * transform.scale) < 1e-10,
+        );
+        const selected = renderScene(PRESET, CATALOG, {
+          ...options,
+          selectedId: "case-7",
+        });
+        assert.equal(
+          firstPolygon(svg, "case-7"),
+          firstPolygon(selected, "case-7"),
+        );
+      }
     }
   }
 });

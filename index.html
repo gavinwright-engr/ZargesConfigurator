@@ -126,6 +126,13 @@
             </div>
             <div class="toolbar-actions">
               <button
+                class="text-button"
+                data-action="paste"
+                title="Paste case (Ctrl/Cmd+V)"
+              >
+                Paste
+              </button>
+              <button
                 class="icon-button"
                 id="undo"
                 data-action="undo"
@@ -161,6 +168,10 @@
                   person</label
                 >
                 <label class="dimension-toggle"
+                  ><input id="soccer-scale" type="checkbox" /> Soccer
+                  ball</label
+                >
+                <label class="dimension-toggle"
                   ><input id="dimensions" type="checkbox" /> Dimensions</label
                 >
               </div>
@@ -171,7 +182,7 @@
                 ><span class="live-dot"></span>
                 <span id="fit-indicator">All cases supported</span></span
               ><span class="canvas-instruction"
-                >Drag to move · Click to inspect · R to rotate</span
+                >4.5 × 2.4 m work area · Keep stacks within 60 cm</span
               ><button
                 class="icon-button"
                 data-action="fit"

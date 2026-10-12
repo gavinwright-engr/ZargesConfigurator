@@ -44,7 +44,11 @@ async function worldPoint(x, y, z = 0) {
       const view = document.querySelector("button[data-view].active").dataset
         .view;
       const humanScale = document.querySelector("#human-scale").checked;
-      const p = getSceneTransform(boxes, CATALOG, view, { humanScale }).project(x, y, z);
+      const soccerScale = document.querySelector("#soccer-scale").checked;
+      const p = getSceneTransform(boxes, CATALOG, view, {
+        humanScale,
+        soccerScale,
+      }).project(x, y, z);
       const client = new DOMPoint(p.x, p.y).matrixTransform(
         document.querySelector("#scene svg").getScreenCTM(),
       );
@@ -68,7 +72,10 @@ async function captureScreenshot(name) {
     null,
     { timeout: 6000 },
   );
-  await page.evaluate(() => document.activeElement?.blur());
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    document.querySelector("#catalog-list").scrollTop = 0;
+  });
   await page.screenshot({
     path: `docs/media/${name}.png`,
     fullPage: true,
@@ -82,20 +89,26 @@ async function captureScreenshot(name) {
 async function sceneGeometry() {
   return page.evaluate(() => {
     const round = (value) => Number(value.toFixed(3));
-    const canvas = document.querySelector("#canvas-wrap").getBoundingClientRect();
+    const canvas = document
+      .querySelector("#canvas-wrap")
+      .getBoundingClientRect();
     const svg = document.querySelector("#scene svg");
     const matrix = svg.getScreenCTM();
     const boxes = {};
     for (const box of svg.querySelectorAll("[data-box-id]")) {
       const polygon = box.querySelector("polygon");
       boxes[box.dataset.boxId] = [...polygon.points].map((point) => {
-        const screen = new DOMPoint(point.x, point.y).matrixTransform(polygon.getScreenCTM());
+        const screen = new DOMPoint(point.x, point.y).matrixTransform(
+          polygon.getScreenCTM(),
+        );
         return [round(screen.x), round(screen.y)];
       });
     }
     return {
       canvas: [canvas.x, canvas.y, canvas.width, canvas.height].map(round),
-      matrix: [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].map(round),
+      matrix: [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].map(
+        round,
+      ),
       boxes,
     };
   });
@@ -111,49 +124,156 @@ async function assertStableSelection(width) {
     // Use the visible capacity badge's center for a genuine physical click.
     // This also catches wrong SVG painter order that hides a case behind its
     // neighbor: the clicked case must be the one that becomes selected.
-    const badge = await page.locator(`#scene [data-box-id="${id}"] .box-capacity`).boundingBox();
+    const badge = await page
+      .locator(`#scene [data-box-id="${id}"] .box-capacity`)
+      .boundingBox();
     assert.ok(badge, `Case ${id} must have a visible badge at ${width}px`);
-    await page.mouse.click(badge.x + badge.width / 2, badge.y + badge.height / 2);
+    await page.mouse.click(
+      badge.x + badge.width / 2,
+      badge.y + badge.height / 2,
+    );
     assert.equal(
-      await page.locator(`#scene [data-box-id="${id}"]`).getAttribute("aria-pressed"),
+      await page
+        .locator(`#scene [data-box-id="${id}"]`)
+        .getAttribute("aria-pressed"),
       "true",
       `Clicking case ${id} must select that case at ${width}px`,
     );
     const selected = await sceneGeometry();
-    assert.deepEqual(selected.canvas, initial.canvas, `Inspector content must not resize the canvas at ${width}px`);
-    assert.deepEqual(selected.matrix, initial.matrix, `Selecting ${id} must not change SVG fitting at ${width}px`);
-    for (const otherId of Object.keys(initial.boxes).filter((other) => other !== id)) {
-      assert.deepEqual(selected.boxes[otherId], initial.boxes[otherId], `Selecting ${id} must not move case ${otherId} at ${width}px`);
+    assert.deepEqual(
+      selected.canvas,
+      initial.canvas,
+      `Inspector content must not resize the canvas at ${width}px`,
+    );
+    assert.deepEqual(
+      selected.matrix,
+      initial.matrix,
+      `Selecting ${id} must not change SVG fitting at ${width}px`,
+    );
+    for (const otherId of Object.keys(initial.boxes).filter(
+      (other) => other !== id,
+    )) {
+      assert.deepEqual(
+        selected.boxes[otherId],
+        initial.boxes[otherId],
+        `Selecting ${id} must not move case ${otherId} at ${width}px`,
+      );
     }
     await page.keyboard.press("Escape");
-    assert.deepEqual(await sceneGeometry(), initial, `Deselecting ${id} must preserve the camera at ${width}px`);
+    assert.deepEqual(
+      await sceneGeometry(),
+      initial,
+      `Deselecting ${id} must preserve the camera at ${width}px`,
+    );
   }
-  assert.deepEqual(await state(), originalPlan, "Selecting cases must not alter their saved coordinates");
+  assert.deepEqual(
+    await state(),
+    originalPlan,
+    "Selecting cases must not alter their saved coordinates",
+  );
 }
 
 async function assertHumanScale() {
   const person = page.locator('#scene [data-person-height-mm="1828.8"]');
   assert.equal(await page.locator("#human-scale").isChecked(), true);
-  assert.equal(await person.count(), 1, "The default scene must include one true six-foot reference");
+  assert.equal(
+    await person.count(),
+    1,
+    "The default scene must include one true six-foot reference",
+  );
   assert.ok(await person.isVisible());
   const heightError = await page.evaluate(async () => {
     const { getSceneTransform } = await import("./src/renderer.js");
     const { CATALOG } = await import("./src/catalog.js");
-    const boxes = JSON.parse(localStorage.getItem("zarges-stack-planner:v1")).boxes;
-    const view = document.querySelector("button[data-view].active").dataset.view;
-    const transform = getSceneTransform(boxes, CATALOG, view, { humanScale: true });
+    const boxes = JSON.parse(
+      localStorage.getItem("zarges-stack-planner:v1"),
+    ).boxes;
+    const view = document.querySelector("button[data-view].active").dataset
+      .view;
+    const transform = getSceneTransform(boxes, CATALOG, view, {
+      humanScale: true,
+    });
     const figure = document.querySelector("#scene .human-figure");
     const actualPixels = figure.getBoundingClientRect().height;
-    const expectedPixels = 1828.8 * transform.scale * document.querySelector("#scene svg").getScreenCTM().d;
+    const expectedPixels =
+      1828.8 *
+      transform.scale *
+      document.querySelector("#scene svg").getScreenCTM().d;
     return Math.abs(actualPixels - expectedPixels);
   });
-  assert.ok(heightError < 0.1, "Person artwork must be 1828.8 mm tall in the same projection as the cases");
+  assert.ok(
+    heightError < 0.1,
+    "Person artwork must be 1828.8 mm tall in the same projection as the cases",
+  );
   const withPerson = await sceneGeometry();
   await page.locator("#human-scale").uncheck();
   assert.equal(await page.locator("#scene [data-person-height-mm]").count(), 0);
   await page.locator("#human-scale").check();
   assert.equal(await person.count(), 1);
-  assert.deepEqual(await sceneGeometry(), withPerson, "Re-enabling the scale figure must restore the same camera");
+  assert.deepEqual(
+    await sceneGeometry(),
+    withPerson,
+    "Re-enabling the scale figure must restore the same camera",
+  );
+}
+
+async function assertSoccerScale() {
+  const before = await state();
+  const initialCamera = await sceneGeometry();
+  assert.equal(
+    await page.locator("#scene [data-soccer-diameter-mm]").count(),
+    0,
+  );
+  await page.locator("#soccer-scale").check();
+  assert.equal(
+    await page.locator('#scene [data-soccer-diameter-mm="220"]').count(),
+    1,
+  );
+  for (const view of ["iso", "front", "top"]) {
+    await page.locator(`button[data-view="${view}"]`).click();
+    const diameterErrors = await page.evaluate(async () => {
+      const { getSceneTransform } = await import("./src/renderer.js");
+      const { CATALOG } = await import("./src/catalog.js");
+      const boxes = JSON.parse(
+        localStorage.getItem("zarges-stack-planner:v1"),
+      ).boxes;
+      const view = document.querySelector("button[data-view].active").dataset
+        .view;
+      const humanScale = document.querySelector("#human-scale").checked;
+      const t = getSceneTransform(boxes, CATALOG, view, {
+        humanScale,
+        soccerScale: true,
+      });
+      const bounds = document
+        .querySelector("#scene .soccer-outline")
+        .getBoundingClientRect();
+      const expected =
+        220 * t.scale * document.querySelector("#scene svg").getScreenCTM().a;
+      return [
+        Math.abs(bounds.width - expected),
+        Math.abs(bounds.height - expected),
+      ];
+    });
+    assert.ok(
+      diameterErrors.every((error) => error < 0.1),
+      "Soccer ball must have a 220 mm diameter in every view",
+    );
+  }
+  await page.locator('button[data-view="iso"]').click();
+  await page.locator("#human-scale").uncheck();
+  assert.equal(
+    await page.locator('#scene [data-soccer-diameter-mm="220"]').count(),
+    1,
+    "Ball and person toggle independently",
+  );
+  await page.locator("#human-scale").check();
+  await page.locator("#soccer-scale").uncheck();
+  assert.deepEqual(await sceneGeometry(), initialCamera);
+  assert.deepEqual(
+    await state(),
+    before,
+    "Scale objects never enter the order or saved plan",
+  );
 }
 try {
   await page.goto(base);
@@ -177,6 +297,7 @@ try {
   );
   await page.locator('[data-unit="mm"]').click();
   await assertHumanScale();
+  await assertSoccerScale();
   for (const width of [1200, 1500, 1900]) await assertStableSelection(width);
   await page.setViewportSize({ width: 1500, height: 1125 });
 
@@ -184,24 +305,43 @@ try {
   // largest standard case. Exercise the same save/import path used by users.
   await page.locator("#search").fill("829");
   assert.equal(await page.locator(".case-card").count(), 1);
-  assert.equal(await page.locator(".case-card").getAttribute("data-model"), "40876");
-  await page.getByRole("button", { name: "Add 829 L case", exact: true }).click();
+  assert.equal(
+    await page.locator(".case-card").getAttribute("data-model"),
+    "40876",
+  );
+  await page
+    .getByRole("button", { name: "Add 829 L case", exact: true })
+    .click();
   await count(9);
-  assert.equal((await state()).filter((box) => box.modelId === "40876").length, 1);
+  assert.equal(
+    (await state()).filter((box) => box.modelId === "40876").length,
+    1,
+  );
   const expandedSave = page.waitForEvent("download");
   await page.locator('[data-action="save"]').click();
-  const expandedJson = await readFile(await (await expandedSave).path(), "utf8");
+  const expandedJson = await readFile(
+    await (await expandedSave).path(),
+    "utf8",
+  );
   await page.locator('[data-action="clear"]').click();
   await count(0);
   await page.locator("#import-file").setInputFiles({
-    name: "full-catalog-plan.json", mimeType: "application/json", buffer: Buffer.from(expandedJson),
+    name: "full-catalog-plan.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(expandedJson),
   });
   await count(9);
-  assert.equal((await state()).find((box) => box.modelId === "40876").rotated, false);
+  assert.equal(
+    (await state()).find((box) => box.modelId === "40876").rotated,
+    false,
+  );
   await page.reload();
   await page.waitForSelector("#scene svg");
   await count(9);
-  assert.equal((await state()).filter((box) => box.modelId === "40876").length, 1);
+  assert.equal(
+    (await state()).filter((box) => box.modelId === "40876").length,
+    1,
+  );
   await page.locator('[data-action="reset"]').first().click();
   await count(8);
   await page.locator("#search").fill("");
@@ -210,7 +350,9 @@ try {
   await page.locator('button[data-view="iso"]').click();
   await page.locator("#dimensions").uncheck();
   await mkdir("docs/media", { recursive: true });
+  await page.locator("#soccer-scale").check();
   await captureScreenshot("desktop");
+  await page.locator("#soccer-scale").uncheck();
 
   // Removing a load-bearing base must be blocked, not silently orphan children.
   await page.locator('#scene [data-box-id="case-4"]').click();
@@ -334,21 +476,17 @@ try {
   const json = await readFile(await (await jsonPromise).path(), "utf8");
   assert.equal(JSON.parse(json).boxes.length, 3);
   await page.locator('[data-action="clear"]').click();
-  await page
-    .locator("#import-file")
-    .setInputFiles({
-      name: "saved.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(json),
-    });
+  await page.locator("#import-file").setInputFiles({
+    name: "saved.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(json),
+  });
   await count(3);
-  await page
-    .locator("#import-file")
-    .setInputFiles({
-      name: "bad.json",
-      mimeType: "application/json",
-      buffer: Buffer.from('{"version":7}'),
-    });
+  await page.locator("#import-file").setInputFiles({
+    name: "bad.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"version":7}'),
+  });
   await count(3);
   assert.match(
     await page.locator("#toast").textContent(),
@@ -399,13 +537,24 @@ try {
   await assertHumanScale();
   await page.locator("#human-scale").uncheck();
   assert.ok(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
     "Mobile must not overflow with the scale figure hidden",
   );
   await page.locator("#human-scale").check();
   assert.ok(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
     "Mobile must not overflow with the six-foot reference visible",
+  );
+  await page.locator("#soccer-scale").check();
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    "Mobile must not overflow with both scale references visible",
   );
   await captureScreenshot("mobile");
   await page
@@ -416,7 +565,7 @@ try {
   await count(8);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: initial preset, full 25-model catalog/filter/search, extra-model save/import/persistence, six-foot scale toggle, stable selection cameras at 1200/1500/1900px, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, CSV/JSON, import rejection, sharing, mobile scale/layout/actions, no browser errors.",
+    "PASS: initial preset, full 25-model catalog/filter/search, extra-model save/import/persistence, six-foot person and 220 mm soccer-ball toggles, stable selection cameras at 1200/1500/1900px, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, CSV/JSON, import rejection, sharing, mobile scale/layout/actions, no browser errors.",
   );
 } finally {
   await browser.close();

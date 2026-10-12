@@ -1,7 +1,10 @@
 # Demo media
 
 These files show the actual app, not design mockups. Screenshots are produced by
-`scripts/browser-check.mjs`; the video records `scripts/record-demo.mjs`.
+`scripts/browser-check.mjs`; `scripts/render-closeup.mjs` also produces the
+enlarged right-stack detail and checks label placement on all catalog models.
+The video records `scripts/record-demo.mjs`. `npm run test:browser` runs these
+alongside clipboard and bounded-placement browser regressions.
 
 ```sh
 npm ci

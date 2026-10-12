@@ -1,5 +1,11 @@
 import { CATALOG, PRESET } from "./catalog.js";
+import { encodeCaseClipboard, parseCaseClipboard } from "./clipboard.js";
 import { getDimensions, inspectLayout, resolveDrop } from "./stacking.js";
+import {
+  validateWorkspace,
+  findFloorPlacement,
+  repairWorkspace,
+} from "./workspace.js";
 import {
   renderScene,
   renderBoxThumbnail,
@@ -25,12 +31,14 @@ let boxes = copy(PRESET),
   units = "mm",
   dimensions = false,
   humanScale = true,
+  soccerScale = false,
   catalogFilter = "all";
 let history = [],
   future = [],
   drag = null,
   toastTimer,
-  startupMessage = "";
+  startupMessage = "",
+  preserveSavedPlan = false;
 
 // Shared links take precedence over local sessions; all external data is validated.
 try {
@@ -40,7 +48,35 @@ try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) boxes = parsePlan(saved);
   }
+  // Older versions allowed unbounded positions. Bring those cases nearby
+  // without deleting any, and retain the original plan as a recovery copy.
+  if (!validateWorkspace(boxes, CATALOG).valid) {
+    const repaired = repairWorkspace(boxes, CATALOG);
+    // If storage is full, leave the original session untouched. A failed
+    // backup must not accidentally render the old, unbounded arrangement.
+    try {
+      localStorage.setItem(
+        `${STORAGE_KEY}:before-workspace-limits`,
+        JSON.stringify(makePlan(boxes)),
+      );
+    } catch {
+      preserveSavedPlan = true;
+    }
+    if (repaired) {
+      boxes = repaired;
+      startupMessage = preserveSavedPlan
+        ? "Distant cases moved into the work area. Storage is unavailable; use Save plan to keep this arrangement."
+        : "Distant cases moved into the work area. All cases kept; original plan backed up on this device.";
+    } else {
+      preserveSavedPlan = true;
+      boxes = copy(PRESET);
+      startupMessage =
+        "Your saved plan exceeds the work area. It is still saved on this device; showing the reference setup.";
+    }
+  }
 } catch (error) {
+  boxes = copy(PRESET);
+  preserveSavedPlan = true;
   startupMessage = `Could not restore plan: ${error.message} Loaded the reference setup.`;
 }
 
@@ -50,7 +86,81 @@ function notify(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $("#toast").classList.remove("visible"), 4400);
 }
+
+let copiedCaseText = "";
+
+// Browser copy/paste events keep OS keyboard shortcuts working without asking
+// for clipboard permission. The buttons also work when clipboard access is denied.
+function clipboardShortcutAllowed(event) {
+  const target = event.target;
+  return (
+    !$("#dialog").open &&
+    !(
+      target instanceof Element &&
+      target.closest(
+        "input,textarea,select,[contenteditable]:not([contenteditable='false'])",
+      )
+    ) &&
+    !window.getSelection()?.toString()
+  );
+}
+function selectedCaseClipboardText() {
+  const selected = boxes.find((box) => box.id === selectedId);
+  if (!selected) {
+    notify("Select a case to copy first.");
+    return null;
+  }
+  copiedCaseText = encodeCaseClipboard(selected);
+  return copiedCaseText;
+}
+function pasteCaseText(text) {
+  const descriptor = parseCaseClipboard(text, CATALOG);
+  if (!descriptor) {
+    notify("Copy a ZARGES case first, then paste it into the workspace.");
+    return false;
+  }
+  // addCase chooses a nearby, valid floor position and assigns a fresh ID.
+  return addCase(descriptor.modelId, null, { rotated: descriptor.rotated });
+}
+async function copySelectedCase() {
+  const text = selectedCaseClipboardText();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    notify("Case copied. Use Ctrl/Cmd+V or Paste to add a copy.");
+  } catch {
+    notify("Case copied in this tab. Use the Paste button to add a copy.");
+  }
+}
+async function pasteCopiedCase() {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    text = copiedCaseText;
+  }
+  // Successfully reading unrelated text must not paste an older internal copy.
+  pasteCaseText(text);
+}
+document.addEventListener("copy", (event) => {
+  if (!clipboardShortcutAllowed(event) || !selectedId || !event.clipboardData)
+    return;
+  const text = selectedCaseClipboardText();
+  if (!text) return;
+  event.clipboardData.setData("text/plain", text);
+  event.preventDefault();
+  notify("Case copied. Use Ctrl/Cmd+V or Paste to add a copy.");
+});
+document.addEventListener("paste", (event) => {
+  if (!clipboardShortcutAllowed(event) || !event.clipboardData) return;
+  event.preventDefault();
+  pasteCaseText(event.clipboardData.getData("text/plain"));
+});
 function persist() {
+  if (preserveSavedPlan) {
+    $("#saved-state").textContent = "Original plan retained on this device";
+    return;
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(makePlan(boxes)));
     $("#saved-state").textContent = "Saved on this device";
@@ -65,6 +175,11 @@ function commit(next, message) {
     );
     return false;
   }
+  const workspace = validateWorkspace(next, CATALOG);
+  if (!workspace.valid) {
+    notify(workspace.issues[0].message);
+    return false;
+  }
   try {
     next = parsePlan({ version: 1, units: "mm", boxes: next });
   } catch (error) {
@@ -75,6 +190,7 @@ function commit(next, message) {
   if (history.length > 60) history.shift();
   future = [];
   boxes = next;
+  preserveSavedPlan = false;
   if (!boxes.some((box) => box.id === selectedId)) selectedId = null;
   persist();
   render();
@@ -124,7 +240,7 @@ function renderSelection() {
   }
   const model = modelFor(selected);
   $("#selection").innerHTML =
-    `<div class="selection-title"><strong>${model.label} · K 470</strong><button class="icon-button" data-action="deselect" aria-label="Deselect case">×</button></div><span class="selection-model">MODEL ${model.id}</span><p>${dimensionText(getDimensions(selected, CATALOG))}<br>Base elevation ${length(selected.z)} ${units} · ${selected.rotated ? "90° orientation" : "0° orientation"}</p><div class="selection-actions"><button data-action="rotate">↻ Rotate</button><button data-action="duplicate">+ Copy</button><button data-action="remove" aria-label="Remove selected case">Remove</button></div><div class="position-controls" aria-label="Move selected case by 10 millimeters"><button data-nudge="-10,0" aria-label="Move left 10 mm">←</button><button data-nudge="0,-10" aria-label="Move back 10 mm">↑</button><button data-nudge="0,10" aria-label="Move forward 10 mm">↓</button><button data-nudge="10,0" aria-label="Move right 10 mm">→</button><span>10 mm steps</span></div><div class="surface-controls"><select id="surface-target" aria-label="Surface to place selected case on"><option value="floor">Clear floor space</option>${boxes
+    `<div class="selection-title"><strong>${model.label} · K 470</strong><button class="icon-button" data-action="deselect" aria-label="Deselect case">×</button></div><span class="selection-model">MODEL ${model.id}</span><p>${dimensionText(getDimensions(selected, CATALOG))}<br>Base elevation ${length(selected.z)} ${units} · ${selected.rotated ? "90° orientation" : "0° orientation"}</p><div class="selection-actions"><button data-action="rotate">↻ Rotate</button><button data-action="copy" title="Copy selected case (Ctrl/Cmd+C)">Copy</button><button data-action="remove" aria-label="Remove selected case">Remove</button></div><div class="position-controls" aria-label="Move selected case by 10 millimeters"><button data-nudge="-10,0" aria-label="Move left 10 mm">←</button><button data-nudge="0,-10" aria-label="Move back 10 mm">↑</button><button data-nudge="0,10" aria-label="Move forward 10 mm">↓</button><button data-nudge="10,0" aria-label="Move right 10 mm">→</button><span>10 mm steps</span></div><div class="surface-controls"><select id="surface-target" aria-label="Surface to place selected case on"><option value="floor">Clear floor space</option>${boxes
       .filter((box) => box.id !== selectedId)
       .map(
         (box, i) =>
@@ -141,6 +257,7 @@ function drawScene(items = boxes) {
     selectedId,
     units,
     humanScale,
+    soccerScale,
   });
   $("#scene")
     .querySelectorAll("[data-box-id]")
@@ -191,28 +308,31 @@ function cleanBox(box) {
   const { id, modelId, x, y, z, rotated } = box;
   return { id, modelId, x, y, z, rotated: !!rotated };
 }
-function addCase(modelId, candidate = null) {
+function addCase(modelId, candidate = null, options = {}) {
   if (boxes.length >= MAX_CASES) {
     notify("This planner supports up to 60 cases per setup.");
-    return;
+    return false;
   }
-  const x = boxes.length
-    ? Math.max(...boxes.map((box) => box.x + getDimensions(box, CATALOG)[0])) +
-      100
-    : 0;
-  const box = candidate || {
-    id: `case-${crypto.randomUUID()}`,
-    modelId,
-    x,
-    y: 0,
-    z: 0,
-    rotated: false,
-  };
+  const box =
+    candidate ||
+    findFloorPlacement(modelId, boxes, CATALOG, {
+      id: `case-${crypto.randomUUID()}`,
+      rotated: !!options.rotated,
+    });
+  if (!box) {
+    notify(
+      "No nearby floor space is available. Stack or remove a case to make room.",
+    );
+    return false;
+  }
+  const previousSelection = selectedId;
   selectedId = box.id;
-  commit(
+  const added = commit(
     [...boxes, cleanBox(box)],
     `${CATALOG.find((model) => model.id === modelId).label} added to your setup.`,
   );
+  if (!added) selectedId = previousSelection;
+  return added;
 }
 function mutateSelected(transform) {
   const selected = boxes.find((box) => box.id === selectedId);
@@ -231,15 +351,17 @@ function placeOnSurface() {
   const target = boxes.find((box) => box.id === $("#surface-target").value);
   const others = boxes.filter((box) => box.id !== selectedId);
   if (!target) {
-    const x = others.length
-      ? Math.max(
-          ...others.map((box) => box.x + getDimensions(box, CATALOG)[0]),
-        ) + 100
-      : 0;
-    commit(
-      [...others, { ...selected, x, y: 0, z: 0 }],
-      "Case placed on the floor.",
+    const placed = findFloorPlacement(
+      selected.modelId,
+      others,
+      CATALOG,
+      selected,
     );
+    if (placed) commit([...others, placed], "Case placed on the floor.");
+    else
+      notify(
+        "No nearby floor space is available, or upper cases still need this support.",
+      );
     return;
   }
   const [tw, td, th] = getDimensions(target, CATALOG);
@@ -313,10 +435,8 @@ const actions = {
   },
   rotate: () => mutateSelected((box) => ({ ...box, rotated: !box.rotated })),
   "place-on": placeOnSurface,
-  duplicate: () => {
-    const box = boxes.find((box) => box.id === selectedId);
-    if (box) addCase(box.modelId);
-  },
+  copy: copySelectedCase,
+  paste: pasteCopiedCase,
   remove: () => {
     if (selectedId)
       commit(
@@ -352,7 +472,7 @@ const actions = {
   },
   guide: () =>
     openDialog(
-      '<span class="eyebrow">A FEW SIMPLE MOVES</span><h2>Make the space yours.</h2><ol><li><strong>Choose a case.</strong> Drag it from the collection or press + to place it on the floor.</li><li><strong>Build your stack.</strong> Drag a case onto another. The planner snaps edges and finds a supported level. Use Top view for precise footprint placement.</li><li><strong>Fine-tune.</strong> Click a case to rotate, copy, remove, or move it in 10 mm steps. Move top cases before their supports.</li><li><strong>Compare.</strong> Switch between 3D, Front, and Top views; show dimensions or switch units.</li><li><strong>Take it with you.</strong> Export your box list, save a JSON plan, or copy a share link.</li></ol><p>Keyboard: Tab then Enter to select a case; R to rotate; Delete to remove; arrow keys to move 10 mm; Ctrl/Cmd+Z to undo. Buttons provide the same actions on touch screens.</p>',
+      '<span class="eyebrow">A FEW SIMPLE MOVES</span><h2>Make the space yours.</h2><ol><li><strong>Choose a case.</strong> Drag it from the collection or press + to place it on the floor.</li><li><strong>Build your stack.</strong> Drag a case onto another. The planner snaps edges and finds a supported level. Use Top view for precise footprint placement.</li><li><strong>Fine-tune.</strong> Click a case to rotate, copy, remove, or move it in 10 mm steps. Move top cases before their supports.</li><li><strong>Compare.</strong> Switch between 3D, Front, and Top views; show dimensions or switch units.</li><li><strong>Take it with you.</strong> Export your box list, save a JSON plan, or copy a share link.</li></ol><p>Keyboard: Tab then Enter to select a case; R to rotate; Delete to remove; arrow keys to move 10 mm; Ctrl/Cmd+C to copy; Ctrl/Cmd+V to paste a new case nearby; Ctrl/Cmd+Z to undo. Copies keep the original model and rotation. Buttons provide the same actions on touch screens.</p>',
     ),
   "catalog-dialog": () =>
     openDialog(
@@ -417,6 +537,10 @@ $("#human-scale").addEventListener("change", (event) => {
   humanScale = event.target.checked;
   drawScene();
 });
+$("#soccer-scale").addEventListener("change", (event) => {
+  soccerScale = event.target.checked;
+  drawScene();
+});
 $(".dialog-close").addEventListener("click", () => $("#dialog").close());
 $("#dialog").addEventListener("click", (event) => {
   if (event.target === $("#dialog")) {
@@ -460,7 +584,10 @@ $("#scene").addEventListener("pointerdown", (event) => {
   }
   const box = boxes.find((item) => item.id === node.dataset.boxId);
   selectedId = box.id;
-  const transform = getSceneTransform(boxes, CATALOG, view, { humanScale }),
+  const transform = getSceneTransform(boxes, CATALOG, view, {
+      humanScale,
+      soccerScale,
+    }),
     point = svgPoint(event),
     world = transform.unproject(point.x, point.y, box.z);
   drag = {
@@ -540,7 +667,9 @@ $("#scene").addEventListener("pointermove", (event) => {
     });
   }
   drag.candidate =
-    candidate && inspectLayout([...others, candidate], CATALOG).valid
+    candidate &&
+    inspectLayout([...others, candidate], CATALOG).valid &&
+    validateWorkspace([...others, candidate], CATALOG).valid
       ? cleanBox(candidate)
       : null;
   $("#scene .placement-preview")?.remove();
@@ -558,7 +687,7 @@ $("#scene").addEventListener("pointermove", (event) => {
   );
   $("#fit-indicator").textContent = drag.candidate
     ? `Release to place · base ${length(drag.candidate.z)} ${units}`
-    : "No supported position here";
+    : "Stay in the work area, near the other cases";
   const ghost = $("#drag-ghost");
   ghost.style.display = "block";
   ghost.style.left = `${event.clientX + 15}px`;
@@ -581,7 +710,7 @@ function endDrag(cancel = false) {
       );
     else {
       notify(
-        "No supported placement there. The case stayed in its original position.",
+        "Use a clear, supported spot in the work area, within 600 mm of the setup. The case stayed in place.",
       );
       render();
     }
@@ -604,7 +733,10 @@ $("#scene").addEventListener("drop", (event) => {
   const modelId = event.dataTransfer.getData("application/x-zarges-model");
   if (!CATALOG.some((model) => model.id === modelId)) return;
   const point = svgPoint(event),
-    transform = getSceneTransform(boxes, CATALOG, view, { humanScale });
+    transform = getSceneTransform(boxes, CATALOG, view, {
+      humanScale,
+      soccerScale,
+    });
   const hit = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest("[data-box-id]"),
@@ -639,22 +771,32 @@ $("#scene").addEventListener("drop", (event) => {
         maxDistance: 250,
       },
     );
-    if (candidate) break;
+    if (candidate && validateWorkspace([...boxes, candidate], CATALOG).valid)
+      break;
+    candidate = null;
   }
   if (candidate) addCase(modelId, candidate);
   else
     notify(
-      "This case needs a larger clear surface. Use + to place it on the floor.",
+      "Drop inside the work area, near the setup, on a large enough surface. Use + for a nearby floor spot.",
     );
 });
 document.addEventListener("keydown", (event) => {
-  if (event.target.matches("input,textarea,select") || $("#dialog").open)
+  if (
+    event.target.closest(
+      "input,textarea,select,[contenteditable]:not([contenteditable='false'])",
+    ) ||
+    $("#dialog").open
+  )
     return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     event.shiftKey ? redo() : undo();
     return;
   }
+  // Leave browser shortcuts such as Cmd/Ctrl+R, C, V, and arrow navigation
+  // alone. Native copy/paste events handle the case clipboard separately.
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
   const node = event.target.closest("[data-box-id]");
   if (node && ["Enter", " "].includes(event.key)) {
     event.preventDefault();

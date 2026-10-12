@@ -12,6 +12,7 @@ const browser = await chromium.launch({
 await mkdir("test-results/video", { recursive: true });
 const context = await browser.newContext({
   viewport: { width: 1500, height: 1125 },
+  permissions: ["clipboard-read", "clipboard-write"],
   recordVideo: {
     dir: "test-results/video",
     size: { width: 1500, height: 1125 },
@@ -49,6 +50,9 @@ async function click(selector) {
 try {
   await caption("K 470 Stack Planner · Your complete eight-case setup", 3000);
   await caption("A 6-foot person puts the cases in perspective", 2000);
+  await page.locator("#soccer-scale").check();
+  await caption("Toggle a 22 cm soccer ball for another familiar scale", 2000);
+  await page.locator("#soccer-scale").uncheck();
   await page.locator("#search").fill("829");
   await caption("All 25 standard K 470 sizes — from 13 to 829 liters", 1800);
   await click('[data-add="40876"]');
@@ -60,6 +64,17 @@ try {
   await page.locator("#search").fill("");
   await click('#scene [data-box-id="case-8"]');
   await caption("Inspect real dimensions, capacity, and position", 2300);
+  await click('[data-action="copy"]');
+  await click('[data-action="paste"]');
+  await caption(
+    "Copy and paste a case — its model and rotation stay the same",
+    2200,
+  );
+  await click('[data-action="undo"]');
+  await caption(
+    "A bounded work area keeps every new case close to your setup",
+    2000,
+  );
   await click("#dimensions");
   await click('button[data-view="front"]');
   await caption("Compare your setup from the front…", 1800);

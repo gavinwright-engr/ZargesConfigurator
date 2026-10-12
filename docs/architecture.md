@@ -49,7 +49,7 @@ Placement reports include `valid`, `code`, `reason`, `supportRatio`, `supportedB
 
 ### Collision and support rules
 
-Cases can touch at their boundaries. A positive intersection in all three axes is a collision. Ground-level cases are supported by an unlimited floor plane; the engine imposes no vehicle or room boundary.
+Cases can touch at their boundaries. A positive intersection in all three axes is a collision. The reusable geometry engine has an unlimited floor plane. The application additionally calls `validateWorkspace` for its bounded planning area.
 
 An elevated case must have its complete rectangular footprint covered by surfaces at exactly its base height. A sweep across clipped support rectangles computes their union area. This avoids counting the same area twice and permits a long case to bridge two equal-height envelopes. Supports at different heights do not combine into one supported surface.
 
@@ -89,6 +89,34 @@ Always inspect the entire proposed layout after moving, rotating, or removing a 
 
 ## Host integration
 
+### Workspace and clipboard modules
+
+`src/workspace.js` exports `WORKSPACE`, `validateWorkspace`, `findFloorPlacement`,
+and `repairWorkspace`. The app limits full case envelopes to 4,500 × 2,400 mm,
+below 3,000 mm high. Footprints must form a connected group with edge-to-edge
+gaps no greater than 600 mm. These constants are interface choices, separate
+from manufacturer dimensions and reusable collision/support geometry.
+
+All additions, rotations, nudges, imports, and drag commits pass workspace
+validation. `findFloorPlacement` searches nearby rectangle edges, including
+later rows, preserves orientation, and returns `null` when no valid spot fits.
+It never extends the stage to accommodate a distant case.
+
+When opening older unbounded sessions, `repairWorkspace` keeps the main valid
+group and relocates distant cases without changing model counts or rotations.
+The original JSON is backed up in localStorage under
+`zarges-stack-planner:v1:before-workspace-limits`. If the complete plan cannot
+fit, the stored original remains intact and the app displays the reference
+setup. A later edit replaces the active saved session; the backup remains.
+
+`src/clipboard.js` defines a versioned plain-text case descriptor containing
+only a known model ID and a boolean rotation. Native copy/paste events support
+Ctrl/Cmd+C and Ctrl/Cmd+V without clipboard permission prompts. Buttons use the
+browser clipboard API and retain a per-tab fallback if access is denied.
+Pasting generates a fresh instance ID and uses the same bounded floor search
+as adding a case. Editable fields, selected page text, and dialogs keep normal
+text copy/paste behavior. Unrelated clipboard text cannot mutate the layout.
+
 ### Browser and plan modules
 
 `src/app.js` owns the event handlers and a small undo/redo history. Every state
@@ -103,8 +131,12 @@ The main workspace has a fixed responsive height. The catalog and inspector
 scroll separately, so clicking a case cannot stretch the canvas or change the
 screen projection. Both `renderScene` and `getSceneTransform` take `humanScale`
 (default `true`); controller pointer operations pass the same value. The scale
-figure is exactly 1828.8 mm (6 ft) tall and does not participate in collision,
-support, capacity, mass, or order quantities. Thumbnail rendering omits it.
+figure is exactly 1828.8 mm (6 ft) tall. The independent `soccerScale` option
+(default `false`) draws a 220 mm diameter soccer ball. Neither reference affects
+collision, support, capacity, mass, or order quantities. Thumbnails omit them.
+`workspace: false` omits the bounded floor for isolated product illustrations.
+Case panels, hardware, and labels remain inside their maximum envelopes;
+the selection highlight is the only intentional outline outside a case.
 
 The catalog includes the complete 25-size standard European K 470 Universal Box
 range. The six reference models are marked `reference: true`; that flag changes
@@ -126,7 +158,8 @@ validation as imports. The URL fragment is not sent to the hosting server.
 
 `boxListCsv` aggregates quantities from validated instances and obtains every
 text field from the trusted catalog. `makePlan` validates before saving, so an
-unsupported or out-of-bounds plan cannot be exported accidentally. No account,
+unsupported or schema-invalid plan cannot be exported accidentally. The controller
+separately enforces the tighter interactive workspace bounds. No account,
 backend storage, or external service is involved.
 
 ### Adopting the geometry
