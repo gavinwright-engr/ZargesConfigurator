@@ -36,13 +36,15 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 - **Copy and paste:** select a case and use **Ctrl/Cmd+C**, then **Ctrl/Cmd+V**, or the **Copy** and **Paste** buttons. Each copy keeps its model and rotation and appears in a nearby clear floor spot. Pasting is undoable; text fields retain normal text editing.
 - **Keep cases together:** the visible work area is **4.5 × 2.4 m**, with a **3 m** height limit. Gaps between neighboring stacks can be at most **60 cm**. Distant drops stay in their original position; new cases wrap into nearby rows. These are planner settings, not manufacturer limits.
 - **Compare sizes:** switch between perspective, front, and top views; show dimensions; toggle millimeters/inches. The model always retains millimeter precision.
-- **Get a sense of scale:** independently toggle the **6-foot person** and a **22 cm soccer ball**. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
+- **Get a sense of scale:** independently toggle the **6-foot person** and a **22 cm soccer ball**. The camera fits the cases and enabled references; hiding both gives a closer view. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
 - **Keep your work:** automatic device-local saving, undo/redo, JSON import/export, and a URL that restores the configuration.
 - **Prepare an order discussion:** export a CSV grouped by manufacturer model, quantity, capacity, dimensions, empty mass, and official product link.
 
 Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow keys move 10 mm; **Ctrl/Cmd+C / V** copies / pastes; **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** redoes. Move upper cases before moving or removing their supports. The surface selector provides stacking without dragging.
 
 ![Close-up of the mixed-height right stack, with hardware inside each case envelope and separate capacity and product labels](docs/media/stack-detail.png)
+
+![The camera fits the cases closely when scale references are hidden](docs/media/boxes-fit.png)
 
 ![Top view with footprint dimensions](docs/media/top-view.png)
 

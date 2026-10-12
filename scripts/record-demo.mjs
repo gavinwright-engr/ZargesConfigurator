@@ -53,6 +53,12 @@ try {
   await page.locator("#soccer-scale").check();
   await caption("Toggle a 22 cm soccer ball for another familiar scale", 2000);
   await page.locator("#soccer-scale").uncheck();
+  await page.locator("#human-scale").uncheck();
+  await caption(
+    "Turn off scale references for a closer look at your cases",
+    2400,
+  );
+  await page.locator("#human-scale").check();
   await page.locator("#search").fill("829");
   await caption("All 25 standard K 470 sizes — from 13 to 829 liters", 1800);
   await click('[data-add="40876"]');

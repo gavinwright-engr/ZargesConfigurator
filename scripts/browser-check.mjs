@@ -96,7 +96,8 @@ async function sceneGeometry() {
     const matrix = svg.getScreenCTM();
     const boxes = {};
     for (const box of svg.querySelectorAll("[data-box-id]")) {
-      const polygon = box.querySelector("polygon");
+      const polygon =
+        box.querySelector(".box-front") || box.querySelector("polygon");
       boxes[box.dataset.boxId] = [...polygon.points].map((point) => {
         const screen = new DOMPoint(point.x, point.y).matrixTransform(
           polygon.getScreenCTM(),
@@ -275,6 +276,80 @@ async function assertSoccerScale() {
     "Scale objects never enter the order or saved plan",
   );
 }
+
+async function assertBoxesFit() {
+  await page.locator("#human-scale").uncheck();
+  await page.locator("#soccer-scale").uncheck();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const originalPlan = await state();
+  for (const view of ["iso", "front", "top"]) {
+    await page.locator(`button[data-view="${view}"]`).click();
+    await page.keyboard.press("Escape");
+    const framing = await page.evaluate(() => {
+      const boxes = document
+        .querySelector("#scene .scene-boxes")
+        .getBoundingClientRect();
+      const svg = document
+        .querySelector("#scene svg")
+        .getBoundingClientRect();
+      const canvas = document
+        .querySelector("#canvas-wrap")
+        .getBoundingClientRect();
+      return {
+        widthRatio: boxes.width / svg.width,
+        horizontalOffset:
+          Math.abs(boxes.x + boxes.width / 2 - svg.x - svg.width / 2) /
+          svg.width,
+        verticalOffset:
+          Math.abs(boxes.y + boxes.height / 2 - svg.y - svg.height / 2) /
+          svg.height,
+        inside:
+          boxes.left >= canvas.left &&
+          boxes.right <= canvas.right &&
+          boxes.top >= canvas.top &&
+          boxes.bottom <= canvas.bottom,
+      };
+    });
+    assert.ok(
+      framing.widthRatio >= 0.75,
+      `${view}: reference cases must fill at least 75% of SVG width, got ${(framing.widthRatio * 100).toFixed(1)}%`,
+    );
+    assert.ok(
+      framing.horizontalOffset < 0.05 && framing.verticalOffset < 0.08,
+      `${view}: reference cases must remain centered`,
+    );
+    assert.ok(
+      framing.inside,
+      `${view}: every reference case must stay inside the canvas`,
+    );
+
+    const initial = await sceneGeometry();
+    for (const id of Object.keys(initial.boxes)) {
+      // Keyboard selection reaches covered lower cases in Top view as well as
+      // visible cases, without mistaking a selection outline for fitted content.
+      const node = page.locator(`#scene [data-box-id="${id}"]`);
+      await node.focus();
+      await page.keyboard.press("Enter");
+      assert.equal(await node.getAttribute("aria-pressed"), "true");
+      assert.deepEqual(
+        await sceneGeometry(),
+        initial,
+        `${view}: selecting ${id} must not change the fitted camera or case geometry`,
+      );
+      await page.keyboard.press("Escape");
+      assert.deepEqual(
+        await sceneGeometry(),
+        initial,
+        `${view}: deselecting ${id} must preserve the fitted camera`,
+      );
+    }
+  }
+  assert.deepEqual(await state(), originalPlan);
+  await page.locator('button[data-view="iso"]').click();
+  await mkdir("docs/media", { recursive: true });
+  await captureScreenshot("boxes-fit");
+  await page.locator("#human-scale").check();
+}
 try {
   await page.goto(base);
   await page.waitForSelector("#scene svg");
@@ -300,6 +375,7 @@ try {
   await assertSoccerScale();
   for (const width of [1200, 1500, 1900]) await assertStableSelection(width);
   await page.setViewportSize({ width: 1500, height: 1125 });
+  await assertBoxesFit();
 
   // The full range must work beyond the six reference models, including the
   // largest standard case. Exercise the same save/import path used by users.
@@ -565,7 +641,7 @@ try {
   await count(8);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: initial preset, full 25-model catalog/filter/search, extra-model save/import/persistence, six-foot person and 220 mm soccer-ball toggles, stable selection cameras at 1200/1500/1900px, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, CSV/JSON, import rejection, sharing, mobile scale/layout/actions, no browser errors.",
+    "PASS: initial preset, full 25-model catalog/filter/search, extra-model save/import/persistence, six-foot person and 220 mm soccer-ball toggles, stable selection cameras at 1200/1500/1900px, cases fill and stay centered in every view with scale objects hidden, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, CSV/JSON, import rejection, sharing, mobile scale/layout/actions, no browser errors.",
   );
 } finally {
   await browser.close();

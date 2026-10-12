@@ -221,19 +221,58 @@ test("every catalogue orientation keeps physical artwork and labels inside its c
   }
 });
 
-test("the entire bounded floor fits the shared camera and thumbnails omit it", () => {
-  for (const view of ["iso", "top"]) {
-    const transform = getSceneTransform(PRESET, CATALOG, view);
-    for (const x of [WORKSPACE.x, WORKSPACE.x + WORKSPACE.length]) {
-      for (const y of [WORKSPACE.y, WORKSPACE.y + WORKSPACE.width]) {
-        const point = transform.project(x, y, 0);
-        assert(point.x >= 0 && point.x <= transform.width);
-        assert(point.y >= 0 && point.y <= transform.height);
+test("the camera closely frames the cases independently of the bounded floor", () => {
+  for (const view of ["iso", "front", "top"]) {
+    const transform = getSceneTransform(PRESET, CATALOG, view, {
+      humanScale: false,
+    });
+    const points = PRESET.flatMap((box) => {
+      const model = CATALOG.find((model) => model.id === box.modelId);
+      const [length, width, height] = box.rotated
+        ? [model.external[1], model.external[0], model.external[2]]
+        : model.external;
+      return [box.x, box.x + length].flatMap((x) =>
+        [box.y, box.y + width].flatMap((y) =>
+          [box.z, box.z + height].map((z) => transform.project(x, y, z)),
+        ),
+      );
+    });
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const left = Math.min(...xs),
+      right = Math.max(...xs);
+    const top = Math.min(...ys),
+      bottom = Math.max(...ys);
+    assert(
+      (right - left) / transform.width >= 0.8,
+      `${view}: cases must fill the view when scale references are hidden`,
+    );
+    assert(Math.abs((left + right) / 2 - transform.width / 2) < 1);
+    assert(Math.abs((top + bottom) / 2 - transform.height / 2) < 20);
+    assert(left > 20 && right < transform.width - 20);
+    assert(top > 20 && bottom < transform.height - 20);
+    for (const humanScale of [false, true]) {
+      for (const soccerScale of [false, true]) {
+        const options = { humanScale, soccerScale };
+        const bounded = getSceneTransform(PRESET, CATALOG, view, options);
+        const unbounded = getSceneTransform(PRESET, CATALOG, view, {
+          ...options,
+          workspace: false,
+        });
+        assert.equal(
+          bounded.scale,
+          unbounded.scale,
+          "Drawing empty floor must not shrink the objects",
+        );
+        assert.deepEqual(bounded.project(0, 0, 0), unbounded.project(0, 0, 0));
       }
     }
+    if (view === "front") continue;
     assert.match(
       renderScene(PRESET, CATALOG, { view }),
-      /data-workspace-length-mm="4500" data-workspace-width-mm="2400"/,
+      new RegExp(
+        `data-workspace-length-mm="${WORKSPACE.length}" data-workspace-width-mm="${WORKSPACE.width}"`,
+      ),
     );
   }
   assert.doesNotMatch(

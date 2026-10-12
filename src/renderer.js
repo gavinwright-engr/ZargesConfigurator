@@ -171,13 +171,9 @@ export function getSceneTransform(boxes, catalog, view = "iso", options = {}) {
       }
     }
   }
-  if (options.workspace !== false) {
-    for (const x of [WORKSPACE.x, WORKSPACE.x + WORKSPACE.length]) {
-      for (const y of [WORKSPACE.y, WORKSPACE.y + WORKSPACE.width]) {
-        points.push(raw(x, y, 0));
-      }
-    }
-  }
+  // Frame the objects being compared, not the empty planning floor. Workspace
+  // limits govern placement independently; offscreen floor is cropped by the
+  // canvas. Selection and dimension annotations never enter these bounds.
   if (!points.length) points.push(raw(0, 0, 0), raw(1200, 600, 650));
   if (options.humanScale !== false) {
     const person = humanPosition(items);

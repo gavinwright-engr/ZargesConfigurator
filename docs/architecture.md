@@ -127,6 +127,10 @@ uses a fixed transform during drags so auto-fit does not move the target under t
 pointer. The renderer supports perspective, front, and top views plus metric or
 converted inch dimension labels.
 
+The camera fits the cases and any enabled scale references. Empty floor never
+enters the fit bounds: its fixed 4.5 × 2.4 m boundary is cropped by the canvas
+when needed, while placement validation still enforces the full work area.
+Hiding the person and ball therefore gives a close view of the cases.
 The main workspace has a fixed responsive height. The catalog and inspector
 scroll separately, so clicking a case cannot stretch the canvas or change the
 screen projection. Both `renderScene` and `getSceneTransform` take `humanScale`
