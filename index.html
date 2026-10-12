@@ -79,7 +79,7 @@
               <span class="eyebrow">01 / CHOOSE YOUR CASES</span>
               <h2>The K 470 collection</h2>
             </div>
-            <span class="count-badge">6</span>
+            <span id="catalog-count" class="count-badge"></span>
           </div>
           <div class="search-wrap">
             <span aria-hidden="true">⌕</span
@@ -89,6 +89,14 @@
               placeholder="Search size or model…"
               aria-label="Search cases by volume or model"
             />
+          </div>
+          <div class="segmented catalog-filters" aria-label="Catalog models">
+            <button class="active" data-catalog="all" aria-pressed="true">
+              All sizes
+            </button>
+            <button data-catalog="reference" aria-pressed="false">
+              Reference setup
+            </button>
           </div>
           <div class="catalog-caption">
             <span>EXTERIOR L × W × H</span>
@@ -147,9 +155,15 @@
                 ><button data-view="front" aria-pressed="false">Front</button
                 ><button data-view="top" aria-pressed="false">Top</button>
               </div>
-              <label class="dimension-toggle"
-                ><input id="dimensions" type="checkbox" /> Dimensions</label
-              >
+              <div class="view-options">
+                <label class="dimension-toggle"
+                  ><input id="human-scale" type="checkbox" checked /> 6 ft
+                  person</label
+                >
+                <label class="dimension-toggle"
+                  ><input id="dimensions" type="checkbox" /> Dimensions</label
+                >
+              </div>
             </div>
             <div id="scene" class="scene" aria-label="Stack workspace"></div>
             <div class="canvas-bottom">

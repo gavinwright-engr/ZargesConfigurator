@@ -99,6 +99,17 @@ uses a fixed transform during drags so auto-fit does not move the target under t
 pointer. The renderer supports perspective, front, and top views plus metric or
 converted inch dimension labels.
 
+The main workspace has a fixed responsive height. The catalog and inspector
+scroll separately, so clicking a case cannot stretch the canvas or change the
+screen projection. Both `renderScene` and `getSceneTransform` take `humanScale`
+(default `true`); controller pointer operations pass the same value. The scale
+figure is exactly 1828.8 mm (6 ft) tall and does not participate in collision,
+support, capacity, mass, or order quantities. Thumbnail rendering omits it.
+
+The catalog includes the complete 25-size standard European K 470 Universal Box
+range. The six reference models are marked `reference: true`; that flag changes
+catalog filtering only, never which models can be placed or imported.
+
 `src/plans.js` defines the portable document:
 
 ```json

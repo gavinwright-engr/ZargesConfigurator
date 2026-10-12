@@ -203,11 +203,29 @@ h1 span {
   border: 1px solid #d9e0e5;
   display: grid;
   grid-template-columns: 260px minmax(400px, 1fr) 264px;
-  min-height: 686px;
+  /* Selection and catalog contents must never resize the camera viewport. */
+  height: 790px;
+  min-height: 0;
 }
 .catalog {
   border-right: 1px solid var(--line);
   padding: 23px 17px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.catalog > * {
+  flex-shrink: 0;
+}
+.catalog-filters {
+  margin-top: 13px;
+  width: 100%;
+}
+.catalog-filters button {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 9px;
 }
 .panel-heading {
   display: flex;
@@ -292,6 +310,15 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+.case-card {
+  flex-shrink: 0;
 }
 .case-card {
   border: 1px solid var(--line);
@@ -471,6 +498,11 @@ h2 {
 .canvas-top > * {
   pointer-events: auto;
 }
+.view-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .dimension-toggle {
   font-size: 10px;
   display: flex;
@@ -578,6 +610,10 @@ h2 {
 .inspector {
   padding: 23px 20px 17px;
   border-left: 1px solid var(--line);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .summary-grid {
   display: grid;
@@ -940,7 +976,7 @@ dialog .inline-code {
 @media (min-width: 1600px) {
   .workspace {
     grid-template-columns: 286px minmax(500px, 1fr) 285px;
-    min-height: 750px;
+    height: 820px;
   }
   .canvas-wrap,
   .scene {
@@ -1030,6 +1066,8 @@ dialog .inline-code {
 @media (max-width: 1000px) {
   .workspace {
     grid-template-columns: 215px minmax(0, 1fr);
+    height: auto;
+    grid-template-rows: 700px auto;
   }
   .inspector {
     grid-column: 1/-1;
@@ -1039,6 +1077,7 @@ dialog .inline-code {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 5px 24px;
     padding: 23px;
+    overflow: visible;
   }
   .inspector .panel-heading {
     grid-column: 1;
@@ -1157,6 +1196,7 @@ dialog .inline-code {
   .workspace {
     display: flex;
     flex-direction: column;
+    height: auto;
   }
   .catalog {
     order: 2;
@@ -1183,6 +1223,9 @@ dialog .inline-code {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 7px;
+    flex: none;
+    max-height: 310px;
+    grid-auto-rows: minmax(64px, auto);
   }
   .case-card {
     grid-template-columns: 52px minmax(0, 1fr) 20px;
@@ -1242,6 +1285,11 @@ dialog .inline-code {
     top: 13px;
     left: 12px;
     right: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .view-options {
+    gap: 8px;
   }
   .segmented button {
     font-size: 9px;

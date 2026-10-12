@@ -43,7 +43,8 @@ async function worldPoint(x, y, z = 0) {
       ).boxes;
       const view = document.querySelector("button[data-view].active").dataset
         .view;
-      const p = getSceneTransform(boxes, CATALOG, view).project(x, y, z);
+      const humanScale = document.querySelector("#human-scale").checked;
+      const p = getSceneTransform(boxes, CATALOG, view, { humanScale }).project(x, y, z);
       const client = new DOMPoint(p.x, p.y).matrixTransform(
         document.querySelector("#scene svg").getScreenCTM(),
       );
@@ -74,21 +75,136 @@ async function captureScreenshot(name) {
     animations: "disabled",
   });
 }
+
+// Inspect actual polygon vertices in browser pixels. A selected outline has a
+// larger bounding box by design, so comparing whole case bounding boxes would
+// mistake its highlight for a camera change.
+async function sceneGeometry() {
+  return page.evaluate(() => {
+    const round = (value) => Number(value.toFixed(3));
+    const canvas = document.querySelector("#canvas-wrap").getBoundingClientRect();
+    const svg = document.querySelector("#scene svg");
+    const matrix = svg.getScreenCTM();
+    const boxes = {};
+    for (const box of svg.querySelectorAll("[data-box-id]")) {
+      const polygon = box.querySelector("polygon");
+      boxes[box.dataset.boxId] = [...polygon.points].map((point) => {
+        const screen = new DOMPoint(point.x, point.y).matrixTransform(polygon.getScreenCTM());
+        return [round(screen.x), round(screen.y)];
+      });
+    }
+    return {
+      canvas: [canvas.x, canvas.y, canvas.width, canvas.height].map(round),
+      matrix: [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].map(round),
+      boxes,
+    };
+  });
+}
+
+async function assertStableSelection(width) {
+  await page.setViewportSize({ width, height: 1125 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.keyboard.press("Escape");
+  const initial = await sceneGeometry();
+  const originalPlan = await state();
+  for (const id of Object.keys(initial.boxes)) {
+    // Use the visible capacity badge's center for a genuine physical click.
+    // This also catches wrong SVG painter order that hides a case behind its
+    // neighbor: the clicked case must be the one that becomes selected.
+    const badge = await page.locator(`#scene [data-box-id="${id}"] .box-capacity`).boundingBox();
+    assert.ok(badge, `Case ${id} must have a visible badge at ${width}px`);
+    await page.mouse.click(badge.x + badge.width / 2, badge.y + badge.height / 2);
+    assert.equal(
+      await page.locator(`#scene [data-box-id="${id}"]`).getAttribute("aria-pressed"),
+      "true",
+      `Clicking case ${id} must select that case at ${width}px`,
+    );
+    const selected = await sceneGeometry();
+    assert.deepEqual(selected.canvas, initial.canvas, `Inspector content must not resize the canvas at ${width}px`);
+    assert.deepEqual(selected.matrix, initial.matrix, `Selecting ${id} must not change SVG fitting at ${width}px`);
+    for (const otherId of Object.keys(initial.boxes).filter((other) => other !== id)) {
+      assert.deepEqual(selected.boxes[otherId], initial.boxes[otherId], `Selecting ${id} must not move case ${otherId} at ${width}px`);
+    }
+    await page.keyboard.press("Escape");
+    assert.deepEqual(await sceneGeometry(), initial, `Deselecting ${id} must preserve the camera at ${width}px`);
+  }
+  assert.deepEqual(await state(), originalPlan, "Selecting cases must not alter their saved coordinates");
+}
+
+async function assertHumanScale() {
+  const person = page.locator('#scene [data-person-height-mm="1828.8"]');
+  assert.equal(await page.locator("#human-scale").isChecked(), true);
+  assert.equal(await person.count(), 1, "The default scene must include one true six-foot reference");
+  assert.ok(await person.isVisible());
+  const heightError = await page.evaluate(async () => {
+    const { getSceneTransform } = await import("./src/renderer.js");
+    const { CATALOG } = await import("./src/catalog.js");
+    const boxes = JSON.parse(localStorage.getItem("zarges-stack-planner:v1")).boxes;
+    const view = document.querySelector("button[data-view].active").dataset.view;
+    const transform = getSceneTransform(boxes, CATALOG, view, { humanScale: true });
+    const figure = document.querySelector("#scene .human-figure");
+    const actualPixels = figure.getBoundingClientRect().height;
+    const expectedPixels = 1828.8 * transform.scale * document.querySelector("#scene svg").getScreenCTM().d;
+    return Math.abs(actualPixels - expectedPixels);
+  });
+  assert.ok(heightError < 0.1, "Person artwork must be 1828.8 mm tall in the same projection as the cases");
+  const withPerson = await sceneGeometry();
+  await page.locator("#human-scale").uncheck();
+  assert.equal(await page.locator("#scene [data-person-height-mm]").count(), 0);
+  await page.locator("#human-scale").check();
+  assert.equal(await person.count(), 1);
+  assert.deepEqual(await sceneGeometry(), withPerson, "Re-enabling the scale figure must restore the same camera");
+}
 try {
   await page.goto(base);
   await page.waitForSelector("#scene svg");
   await count(8);
   assert.match(await page.locator("#total-volume").textContent(), /567/);
   assert.equal(await page.locator("#total-weight").textContent(), "47.4 kg");
+  assert.equal(await page.locator("#catalog-count").textContent(), "25");
+  assert.equal(await page.locator(".case-card").count(), 25);
+  await page.locator('[data-catalog="reference"]').click();
+  assert.equal(await page.locator(".case-card").count(), 6);
+  await page.locator('[data-catalog="all"]').click();
+  assert.equal(await page.locator(".case-card").count(), 25);
   await page.locator("#search").fill("40847");
   assert.equal(await page.locator(".case-card").count(), 1);
   await page.locator("#search").fill("");
   await page.locator('[data-unit="in"]').click();
   assert.match(
-    await page.locator(".case-info p").first().textContent(),
+    await page.locator('[data-model="40810"] .case-info p').textContent(),
     /23.62 × 15.75 × 7.09 in/,
   );
   await page.locator('[data-unit="mm"]').click();
+  await assertHumanScale();
+  for (const width of [1200, 1500, 1900]) await assertStableSelection(width);
+  await page.setViewportSize({ width: 1500, height: 1125 });
+
+  // The full range must work beyond the six reference models, including the
+  // largest standard case. Exercise the same save/import path used by users.
+  await page.locator("#search").fill("829");
+  assert.equal(await page.locator(".case-card").count(), 1);
+  assert.equal(await page.locator(".case-card").getAttribute("data-model"), "40876");
+  await page.getByRole("button", { name: "Add 829 L case", exact: true }).click();
+  await count(9);
+  assert.equal((await state()).filter((box) => box.modelId === "40876").length, 1);
+  const expandedSave = page.waitForEvent("download");
+  await page.locator('[data-action="save"]').click();
+  const expandedJson = await readFile(await (await expandedSave).path(), "utf8");
+  await page.locator('[data-action="clear"]').click();
+  await count(0);
+  await page.locator("#import-file").setInputFiles({
+    name: "full-catalog-plan.json", mimeType: "application/json", buffer: Buffer.from(expandedJson),
+  });
+  await count(9);
+  assert.equal((await state()).find((box) => box.modelId === "40876").rotated, false);
+  await page.reload();
+  await page.waitForSelector("#scene svg");
+  await count(9);
+  assert.equal((await state()).filter((box) => box.modelId === "40876").length, 1);
+  await page.locator('[data-action="reset"]').first().click();
+  await count(8);
+  await page.locator("#search").fill("");
   await page.locator("#dimensions").check();
   await page.locator('button[data-view="front"]').click();
   await page.locator('button[data-view="iso"]').click();
@@ -182,8 +298,9 @@ try {
     .click();
   await page.locator('button[data-view="top"]').click();
   async function catalogDrop(modelId, x, y, z) {
-    const p = await worldPoint(x, y, z),
-      card = page.locator(`[data-model="${modelId}"]`);
+    const card = page.locator(`[data-model="${modelId}"]`);
+    await card.scrollIntoViewIfNeeded();
+    const p = await worldPoint(x, y, z);
     const bounds = await card.boundingBox();
     await page.mouse.move(bounds.x + 25, bounds.y + 25);
     await page.mouse.down();
@@ -279,6 +396,17 @@ try {
     ),
     "Mobile must not overflow horizontally",
   );
+  await assertHumanScale();
+  await page.locator("#human-scale").uncheck();
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    "Mobile must not overflow with the scale figure hidden",
+  );
+  await page.locator("#human-scale").check();
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    "Mobile must not overflow with the six-foot reference visible",
+  );
   await captureScreenshot("mobile");
   await page
     .getByRole("button", { name: "Add 29 L case", exact: true })
@@ -288,7 +416,7 @@ try {
   await count(8);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: initial preset, search, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, persistence, CSV/JSON, import rejection, sharing, mobile layout/actions, no browser errors.",
+    "PASS: initial preset, full 25-model catalog/filter/search, extra-model save/import/persistence, six-foot scale toggle, stable selection cameras at 1200/1500/1900px, units/views, support blocking, undo/redo, pointer stacking, isometric badge-to-lid dragging, keyboard surface placement, mixed-footprint catalog drops, CSV/JSON, import rejection, sharing, mobile scale/layout/actions, no browser errors.",
   );
 } finally {
   await browser.close();

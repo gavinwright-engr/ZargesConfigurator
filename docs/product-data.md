@@ -1,8 +1,12 @@
 # Product data and what “fits” means
 
-The catalog contains the six standard K 470 models identified from the reference image. The image supplies capacities and an arrangement, rather than readable product numbers; model identification follows the manufacturer's catalog. Data was checked against official ZARGES pages on **12 October 2026**. All dimensions below are **length × width × height in millimetres**. Weights refer to empty cases; capacities are the manufacturer's nominal litre values.
+The catalog contains **all 25 standard European K 470 Universal Box sizes**, from **13 L to 829 L**. Six of those models reproduce the reference image; the other 19 are available for building different arrangements. The image supplies capacities and an arrangement, rather than readable product numbers; model identification follows the manufacturer's catalog. Data was checked against official ZARGES pages on **12 October 2026**. All dimensions below are **length × width × height in millimetres**. Weights refer to empty cases; capacities are the manufacturer's nominal litre values.
+
+“Full catalog” here means the 25 standard sizes listed in the [official European K 470 Universal Box range](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40568). It does not include other product families, K 470 Plus, separate IP65/IP67 variants, accessories, custom dimensions, or additional US-specific variants. Those require their own verified product records and measurement conventions. Product availability and regional ordering are not implied by inclusion in the planner.
 
 ## Catalog
+
+The first six rows are the reference models. Their order and the eight-case starter plan are preserved; `reference: true` identifies them in [`src/catalog.js`](../src/catalog.js). The remaining entries have `reference: false`. Only the two 60 L models share a capacity, so the longer 40847 is explicitly labelled **60 L long**.
 
 | Model | Capacity | Maximum outside dimensions | Inside dimensions | Empty weight |
 | --- | ---: | --- | --- | ---: |
@@ -12,8 +16,29 @@ The catalog contains the six standard K 470 models identified from the reference
 | [40564](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40564) | 73 L | 600 × 400 × 410 | 550 × 350 × 380 | 5.3 kg |
 | [40847](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40847) | 60 L, long | 1200 × 400 × 180 | 1150 × 350 × 150 | 7.5 kg |
 | [40565](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40565) | 157 L | 800 × 600 × 410 | 750 × 550 × 380 | 10.0 kg |
+| [40835](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40835) | 13 L | 400 × 300 × 180 | 350 × 250 × 150 | 2.6 kg |
+| [40677](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40677) | 27 L | 400 × 300 × 340 | 350 × 250 × 310 | 3.1 kg |
+| [40849](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40849) | 66 L | 600 × 600 × 250 | 550 × 550 × 220 | 5.6 kg |
+| [40859](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40859) | 115 L | 600 × 600 × 410 | 550 × 550 × 380 | 6.6 kg |
+| [40836](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40836) | 175 L | 600 × 600 × 610 | 550 × 550 × 580 | 7.8 kg |
+| [40837](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40837) | 116 L | 650 × 480 × 480 | 600 × 430 × 450 | 6.5 kg |
+| [40839](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40839) | 148 L | 650 × 610 × 470 | 600 × 560 × 440 | 7.4 kg |
+| [40841](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40841) | 121 L | 740 × 510 × 410 | 690 × 460 × 380 | 6.9 kg |
+| [40842](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40842) | 150 L | 740 × 690 × 370 | 690 × 640 × 340 | 8.0 kg |
+| [40843](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40843) | 190 L | 740 × 690 × 460 | 690 × 640 × 430 | 8.6 kg |
+| [40566](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40566) | 239 L | 800 × 600 × 610 | 750 × 550 × 580 | 12.0 kg |
+| [40844](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40844) | 195 L | 830 × 530 × 550 | 780 × 480 × 520 | 11.1 kg |
+| [40845](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40845) | 173 L | 950 × 530 × 430 | 900 × 480 × 400 | 11.0 kg |
+| [40846](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40846) | 259 L | 950 × 690 × 480 | 900 × 640 × 450 | 13.4 kg |
+| [40567](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40567) | 162 L | 1000 × 500 × 410 | 950 × 450 × 380 | 10.9 kg |
+| [40580](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40580) | 414 L | 1200 × 800 × 510 | 1150 × 750 × 480 | 20.0 kg |
+| [40848](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40848) | 119 L | 1400 × 450 × 250 | 1350 × 400 × 220 | 9.5 kg |
+| [40875](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40875) | 396 L | 1600 × 600 × 495 | 1550 × 550 × 465 | 23.5 kg |
+| [40876](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40876) | 829 L | 1700 × 800 × 700 | 1650 × 750 × 670 | 30.0 kg |
 
-The [official 40678 product page](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40678) includes a variants table confirming the four 600 × 400 mm models. The [official 40837 variants table](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40837) confirms the 40847 and 40565 rows, including their weights. Links sometimes redirect according to locale; equivalent regional K 470 pages also expose the variants table.
+The [official 40678 product page](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40678) includes a variants table confirming the four 600 × 400 mm reference models. The [40677 page](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40677) confirms the 13 L and 27 L dimensions and weights. The [40839 variants table](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40839) supplies the square and intermediate cases, while the [40848 page and variants table](https://www.zarges.com/en/products/k-470-universal-box/k-470-universal-box-40848) confirms the larger and long cases. All 25 entries have published inside dimensions, maximum outside dimensions, capacity, and empty weight; none of those fields are estimated or missing.
+
+The [UK K 470 range table](https://www.zarges.com/uk/products/k-470-universal-container) and [German K 470 range table](https://www.zarges.com/de/produkte/k-470-universalkiste) provide regional cross-checks of the same standard records. Links sometimes redirect according to locale; equivalent regional K 470 pages also expose the variants table. Research used the indexed official page content when direct page retrieval entered a locale redirect loop.
 
 Catalog data lives in [`src/catalog.js`](../src/catalog.js). No live scraping, product photography, checkout, prices, or availability feed is required to run the planner.
 

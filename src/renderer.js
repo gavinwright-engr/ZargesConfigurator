@@ -9,6 +9,7 @@
 let renderNumber = 0;
 const VIEWBOX_WIDTH = 1000;
 const VIEWBOX_HEIGHT = 680;
+const HUMAN_HEIGHT_MM = 1828.8;
 const escape = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -61,12 +62,93 @@ function projection(view) {
   return { xx: 0.98, xy: -0.055, yx: -0.44, yy: -0.25, zy: -1 };
 }
 
+function humanPosition(items) {
+  return {
+    x:
+      (items.length
+        ? Math.max(...items.map((item) => item.x + item.length))
+        : 1200) + 650,
+    y: items.length ? Math.min(...items.map((item) => item.y)) : 0,
+  };
+}
+
+/**
+ * Establish occlusion from separating planes, rather than base elevation.
+ * The isometric camera sees the minimum x/y faces and maximum z faces. A
+ * right-hand case therefore goes behind a left-hand case whenever their
+ * heights overlap—even when the right-hand case starts higher in the stack.
+ * Conflicting separating directions mean the silhouettes cannot overlap.
+ */
+function orderForDrawing(items, view) {
+  const edges = items.map(() => new Set());
+  const incoming = items.map(() => 0);
+  const tolerance = 0.001;
+  const separation = (a, aSize, b, bSize) => {
+    if (a + aSize <= b + tolerance) return -1;
+    if (b + bSize <= a + tolerance) return 1;
+    return 0;
+  };
+  for (let first = 0; first < items.length; first += 1) {
+    for (let second = first + 1; second < items.length; second += 1) {
+      const a = items[first];
+      const b = items[second];
+      const x = separation(a.x, a.length, b.x, b.length);
+      const y = separation(a.y, a.width, b.y, b.width);
+      const z = separation(a.z, a.height, b.z, b.height);
+      let directions;
+      if (view === "top") {
+        if (x || y) continue;
+        directions = [z];
+      } else if (view === "front") {
+        if (x || z) continue;
+        directions = [-y];
+      } else {
+        directions = [-x, -y, z];
+      }
+      const before = directions.includes(-1);
+      const after = directions.includes(1);
+      if (before === after) continue;
+      const [back, front] = before ? [first, second] : [second, first];
+      edges[back].add(front);
+      incoming[front] += 1;
+    }
+  }
+  const depth = (item) => {
+    const x = item.x + item.length / 2;
+    const y = item.y + item.width / 2;
+    const z = item.z + item.height / 2;
+    return view === "top"
+      ? z
+      : view === "front"
+        ? -y
+        : -0.449 * x - y + 0.275 * z;
+  };
+  const remaining = new Set(items.map((_, index) => index));
+  const ordered = [];
+  while (remaining.size) {
+    const available = [...remaining].filter((index) => incoming[index] === 0);
+    // Imported intersecting layouts may produce a cycle. Keep those visible
+    // and deterministic; the geometry validator reports the invalid layout.
+    const choices = available.length ? available : [...remaining];
+    choices.sort(
+      (a, b) =>
+        depth(items[a]) - depth(items[b]) ||
+        String(items[a].id).localeCompare(String(items[b].id)),
+    );
+    const next = choices[0];
+    remaining.delete(next);
+    ordered.push(items[next]);
+    for (const front of edges[next]) incoming[front] -= 1;
+  }
+  return ordered;
+}
+
 /**
  * Return the exact transform used by renderScene. Pointer coordinates supplied
  * to unproject must be in SVG viewBox units, not browser/client pixels.
  * Front view has no depth axis, so its inverse returns y=0.
  */
-export function getSceneTransform(boxes, catalog, view = "iso") {
+export function getSceneTransform(boxes, catalog, view = "iso", options = {}) {
   const axes = projection(view);
   const items = itemsWithModels(boxes, catalog);
   const raw = (x, y, z) => ({
@@ -83,6 +165,19 @@ export function getSceneTransform(boxes, catalog, view = "iso") {
     }
   }
   if (!points.length) points.push(raw(0, 0, 0), raw(1200, 600, 650));
+  if (options.humanScale !== false) {
+    const person = humanPosition(items);
+    const base = raw(person.x, person.y, 0);
+    // A billboard uses the same millimetre scale as vertical case edges.
+    // The top view uses a shoulder/head footprint instead of standing height.
+    points.push(
+      {
+        x: base.x - 400,
+        y: base.y - (view === "top" ? 300 : HUMAN_HEIGHT_MM + 60),
+      },
+      { x: base.x + 700, y: base.y + (view === "top" ? 300 : 110) },
+    );
+  }
   const minX = Math.min(...points.map((point) => point.x));
   const maxX = Math.max(...points.map((point) => point.x));
   const minY = Math.min(...points.map((point) => point.y));
@@ -458,6 +553,41 @@ function drawFloor(items, drawing, prefix, view) {
   return `${art}</g>`;
 }
 
+function drawHumanScale(items, transform, view, units) {
+  const position = humanPosition(items);
+  const base = transform.project(position.x, position.y, 0);
+  const scale = transform.scale;
+  const height = HUMAN_HEIGHT_MM * scale;
+  const headY = base.y - height;
+  let illustration;
+  if (view === "top") {
+    illustration = `<g transform="translate(${number(base.x)} ${number(base.y)}) scale(${scale})" fill="#7b8d99" opacity=".42">
+      <ellipse rx="260" ry="130"/>
+      <ellipse rx="100" ry="110" fill="#536d7e"/>
+    </g>`;
+  } else {
+    // A 1000-unit silhouette is scaled to precisely 1828.8 mm. Crown y=0 and
+    // soles y=1000 give the height an auditable physical reference.
+    illustration = `<ellipse cx="${number(base.x)}" cy="${number(base.y + 2)}" rx="${number(290 * scale)}" ry="${number(40 * scale)}" fill="#718491" opacity=".12"/>
+      <g class="human-figure" transform="translate(${number(base.x)} ${number(headY)}) scale(${height / 1000})" fill="#798b98" fill-opacity=".38">
+        <ellipse cx="0" cy="67" rx="60" ry="67"/>
+        <path d="M-32 133 L-34 161 Q-90 160 -118 181 Q-143 205 -153 284 L-189 487 Q-196 511 -176 518 Q-158 524 -150 500 L-110 342 L-100 525 L-127 951 Q-132 990 -103 1000 L-58 1000 Q-40 993 -39 973 L-19 705 Q-16 686 0 684 Q16 686 19 705 L39 973 Q40 993 58 1000 L103 1000 Q132 990 127 951 L100 525 L110 342 L150 500 Q158 524 176 518 Q196 511 189 487 L153 284 Q143 205 118 181 Q90 160 34 161 L32 133Z"/>
+      </g>
+      <g stroke="#8ba0af" stroke-width=".85" opacity=".7">
+        <line x1="${number(base.x + 450 * scale)}" y1="${number(headY)}" x2="${number(base.x + 450 * scale)}" y2="${number(base.y)}"/>
+        <path d="M${number(base.x + 450 * scale - 4)} ${number(headY)}h8 M${number(base.x + 450 * scale - 4)} ${number(base.y)}h8"/>
+      </g>
+      <g transform="translate(${number(base.x + 450 * scale)} ${number(base.y - height / 2)}) rotate(-90)">
+        <rect x="-43" y="-10" width="86" height="20" rx="4" fill="#f4f7f9"/>
+        <text text-anchor="middle" y="4" font-family="Inter,Arial,sans-serif" font-size="10" fill="#718695">${units === "in" ? "72 in" : "1,828.8 mm"}</text>
+      </g>`;
+  }
+  return `<g class="human-scale" data-person-height-mm="1828.8" pointer-events="none" aria-label="Six-foot person for scale, 1,828.8 millimetres tall">
+    ${illustration}
+    <text x="${number(base.x)}" y="${number(base.y + (view === "top" ? 150 * scale + 22 : 26))}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="600" fill="#758997">6 ft / 1.83 m</text>
+  </g>`;
+}
+
 function drawDimensions(items, drawing, selectedId, view, units = "mm") {
   if (!items.length) return "";
   const { project, line } = drawing;
@@ -490,7 +620,10 @@ function drawDimensions(items, drawing, selectedId, view, units = "mm") {
     );
     const labelY = Math.max(
       labelHalfHeight + 8,
-      Math.min(VIEWBOX_HEIGHT - labelHalfHeight - 8, midY + (vertical ? 0 : 18)),
+      Math.min(
+        VIEWBOX_HEIGHT - labelHalfHeight - 8,
+        midY + (vertical ? 0 : 18),
+      ),
     );
     const label =
       units === "in"
@@ -519,21 +652,20 @@ export function renderScene(boxes, catalog, options = {}) {
     labels: true,
     dimensions: false,
     units: "mm",
+    humanScale: true,
     ...options,
   };
   const prefix = `zarges-${++renderNumber}`;
-  const transform = getSceneTransform(boxes, catalog, settings.view);
+  const transform = getSceneTransform(boxes, catalog, settings.view, settings);
   const drawing = createDrawing(transform, prefix);
   const items = itemsWithModels(boxes, catalog);
-  // Render rear cases first; elevation takes priority to keep stacked lids
-  // behind the case resting on them. Stable ids make selection independent.
-  items.sort((a, b) => a.z - b.z || b.x + b.y - (a.x + a.y));
-  const artwork = items
+  const artwork = orderForDrawing(items, settings.view)
     .map((box) => drawBox(box, drawing, settings, transform.scale, prefix))
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" class="stack-scene" viewBox="0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}" width="100%" height="100%" aria-label="Interactive aluminum case stack planner" style="display:block;overflow:visible;touch-action:none" data-view="${escape(settings.view)}">
     ${definitions(prefix)}${drawFloor(items, drawing, prefix, settings.view)}
     <g class="scene-boxes">${artwork}</g>
+    ${settings.humanScale ? drawHumanScale(items, transform, settings.view, settings.units) : ""}
     ${settings.dimensions ? drawDimensions(items, drawing, settings.selectedId, settings.view, settings.units) : ""}
   </svg>`;
 }
@@ -619,6 +751,7 @@ export function renderBoxThumbnail(model) {
       view: "iso",
       labels: false,
       thumbnail: true,
+      humanScale: false,
     },
   )
     .replace('class="stack-scene"', 'class="box-thumbnail" aria-hidden="true"')

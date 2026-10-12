@@ -48,6 +48,16 @@ async function click(selector) {
 }
 try {
   await caption("K 470 Stack Planner · Your complete eight-case setup", 3000);
+  await caption("A 6-foot person puts the cases in perspective", 2000);
+  await page.locator("#search").fill("829");
+  await caption("All 25 standard K 470 sizes — from 13 to 829 liters", 1800);
+  await click('[data-add="40876"]');
+  await caption(
+    "Add any catalog model, even outside the reference setup",
+    2200,
+  );
+  await click('[data-action="reset"]');
+  await page.locator("#search").fill("");
   await click('#scene [data-box-id="case-8"]');
   await caption("Inspect real dimensions, capacity, and position", 2300);
   await click("#dimensions");

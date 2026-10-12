@@ -23,7 +23,9 @@ let boxes = copy(PRESET),
   selectedId = null,
   view = "iso",
   units = "mm",
-  dimensions = false;
+  dimensions = false,
+  humanScale = true,
+  catalogFilter = "all";
 let history = [],
   future = [],
   drag = null,
@@ -90,9 +92,20 @@ function dimensionText(values) {
 
 function renderCatalog() {
   const query = $("#search").value.trim().toLowerCase();
-  const visible = CATALOG.filter((model) =>
-    `${model.label} ${model.id} K 470`.toLowerCase().includes(query),
+  const referenceIds = new Set(
+    CATALOG.filter((model) => model.reference).map((model) => model.id),
   );
+  const visible = CATALOG.filter(
+    (model) =>
+      (catalogFilter === "all" || model.reference) &&
+      `${model.label} ${model.id} ${model.external.join(" ")} K 470`
+        .toLowerCase()
+        .includes(query),
+  ).sort((a, b) => a.volume - b.volume || a.external[0] - b.external[0]);
+  $("#catalog-count").textContent = CATALOG.length;
+  $("[data-catalog='all']").textContent = `All ${CATALOG.length} sizes`;
+  $("[data-catalog='reference']").textContent =
+    `Reference ${referenceIds.size}`;
   $("#catalog-list").innerHTML =
     visible
       .map(
@@ -127,6 +140,7 @@ function drawScene(items = boxes) {
     dimensions,
     selectedId,
     units,
+    humanScale,
   });
   $("#scene")
     .querySelectorAll("[data-box-id]")
@@ -342,7 +356,17 @@ const actions = {
     ),
   "catalog-dialog": () =>
     openDialog(
-      `<span class="eyebrow">THE K 470 COLLECTION</span><h2>Six sizes. More possibilities.</h2><p>All models in your reference setup. Dimensions below are maximum outer envelopes, not internal packing space.</p><table><thead><tr><th>CAPACITY</th><th>MODEL</th><th>EXTERIOR / mm</th><th>INTERIOR / mm</th></tr></thead><tbody>${CATALOG.map((model) => `<tr><td>${model.label}</td><td><a href="${model.url}" target="_blank" rel="noreferrer">${model.id} <svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></td><td>${model.external.join(" × ")}</td><td>${model.internal.join(" × ")}</td></tr>`).join("")}</tbody></table><p>Different regional catalogs can report different measurement envelopes. This planner consistently uses the European published values.</p>`,
+      `<span class="eyebrow">THE K 470 COLLECTION</span><h2>${CATALOG.length} sizes. More possibilities.</h2><p>The complete standard K 470 Universal Box range. Dimensions below are maximum outer envelopes, not internal packing space. Special IP65/IP67 variants and other ZARGES series are separate product ranges.</p><table><thead><tr><th>CAPACITY</th><th>MODEL</th><th>EXTERIOR / mm</th><th>INTERIOR / mm</th></tr></thead><tbody>${[
+        ...CATALOG,
+      ]
+        .sort((a, b) => a.volume - b.volume)
+        .map(
+          (model) =>
+            `<tr><td>${model.label}</td><td><a href="${model.url}" target="_blank" rel="noreferrer">${model.id} <svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></td><td>${model.external.join(" × ")}</td><td>${model.internal.join(" × ")}</td></tr>`,
+        )
+        .join(
+          "",
+        )}</tbody></table><p>Different regional catalogs can report different measurement envelopes. This planner consistently uses the European published values.</p>`,
     ),
 };
 document.addEventListener("click", (event) => {
@@ -350,6 +374,15 @@ document.addEventListener("click", (event) => {
   if (add) return addCase(add.dataset.add);
   const action = event.target.closest("[data-action]");
   if (action) actions[action.dataset.action]?.();
+  const filter = event.target.closest("button[data-catalog]");
+  if (filter) {
+    catalogFilter = filter.dataset.catalog;
+    document.querySelectorAll("button[data-catalog]").forEach((button) => {
+      button.classList.toggle("active", button === filter);
+      button.setAttribute("aria-pressed", String(button === filter));
+    });
+    renderCatalog();
+  }
   const unit = event.target.closest("[data-unit]");
   if (unit) {
     units = unit.dataset.unit;
@@ -379,6 +412,10 @@ $("#search").addEventListener("input", renderCatalog);
 $("#dimensions").addEventListener("change", (event) => {
   dimensions = event.target.checked;
   render();
+});
+$("#human-scale").addEventListener("change", (event) => {
+  humanScale = event.target.checked;
+  drawScene();
 });
 $(".dialog-close").addEventListener("click", () => $("#dialog").close());
 $("#dialog").addEventListener("click", (event) => {
@@ -423,7 +460,7 @@ $("#scene").addEventListener("pointerdown", (event) => {
   }
   const box = boxes.find((item) => item.id === node.dataset.boxId);
   selectedId = box.id;
-  const transform = getSceneTransform(boxes, CATALOG, view),
+  const transform = getSceneTransform(boxes, CATALOG, view, { humanScale }),
     point = svgPoint(event),
     world = transform.unproject(point.x, point.y, box.z);
   drag = {
@@ -567,7 +604,7 @@ $("#scene").addEventListener("drop", (event) => {
   const modelId = event.dataTransfer.getData("application/x-zarges-model");
   if (!CATALOG.some((model) => model.id === modelId)) return;
   const point = svgPoint(event),
-    transform = getSceneTransform(boxes, CATALOG, view);
+    transform = getSceneTransform(boxes, CATALOG, view, { humanScale });
   const hit = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest("[data-box-id]"),

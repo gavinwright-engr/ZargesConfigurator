@@ -2,7 +2,7 @@
 
 A browser-based way to answer a simple question: **which cases fit together, and how much space will my setup take?**
 
-Choose from six K 470 models, drag dimensionally accurate cases into a stack, inspect the result from three views, and export a model-by-model box list. The default scene recreates the two stacks in the original reference: **8 cases, 567 L, 47.4 kg empty**.
+Choose from all **25 standard K 470 Universal Box sizes (13–829 L)**, drag dimensionally accurate cases into a stack, inspect the result from three views, and export a model-by-model box list. A **6-foot / 1828.8 mm person** provides a real-world scale reference. The default scene recreates the two stacks in the original reference: **8 cases, 567 L, 47.4 kg empty**.
 
 An independent, open-source product concept by Gavin Wright. Not affiliated with or endorsed by ZARGES.
 
@@ -31,8 +31,10 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 ## What you can do
 
 - **Build a stack:** drag from the catalog, or add a case with + and move it in the workspace. Edges snap; overlapping and unsupported placements are rejected.
+- **Explore the full catalog:** browse or search all 25 standard K 470 sizes, or filter to the six models in the reference arrangement. The catalog scrolls independently of the workspace.
 - **Place precisely:** select a case to rotate, duplicate, remove, or move it in 10 mm steps. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
 - **Compare sizes:** switch between perspective, front, and top views; show dimensions; toggle millimeters/inches. The model always retains millimeter precision.
+- **Get a sense of scale:** show or hide the 6-foot person. Selecting a case keeps the camera and canvas size fixed; the details panel scrolls independently.
 - **Keep your work:** automatic device-local saving, undo/redo, JSON import/export, and a URL that restores the configuration.
 - **Prepare an order discussion:** export a CSV grouped by manufacturer model, quantity, capacity, dimensions, empty mass, and official product link.
 
@@ -49,7 +51,7 @@ Keyboard: Tab + Enter selects a case; **R** rotates; **Delete** removes; arrow k
 
 ## The pictured cases
 
-The data uses ZARGES Europe's published **maximum outside dimensions**, consistently across every model. Displayed inches are conversions of that same dataset. Regional product pages use different dimensional conventions; see the [source notes](docs/product-data.md).
+The table below lists the six reference models; the app also includes the other 19 standard sizes. The data uses ZARGES Europe's published **maximum outside dimensions**, consistently across every model. Displayed inches are conversions of that same dataset. Regional product pages use different dimensional conventions; see the [complete 25-model table and source notes](docs/product-data.md). Special IP65/IP67 variants, other ZARGES series, and custom sizes are outside this standard K 470 catalog.
 
 | Capacity | Model | Exterior L × W × H (mm) | Empty mass | Reference quantity |
 | --- | --- | --- | --- | --- |
@@ -104,7 +106,7 @@ npm start                  # Keep running in one terminal
 npm run test:browser       # In another terminal
 ```
 
-Tests cover the exact reference layout, rotated footprints, bridges, partial support, overlap, uneven supports, orphaned cases, plan validation and round trips, and CSV quantities. Browser checks exercise real pointer stacking, catalog drops into both halves of the large base, keyboard placement, search, views, units, undo/redo, downloads, imports, shared links, persistence, and mobile layout. The app loads no remote fonts, analytics, product images, or services.
+Tests cover the exact reference layout, rotated footprints, bridges, partial support, overlap, uneven supports, orphaned cases, plan validation and round trips, CSV quantities, drawing order, and the human scale reference. Browser checks exercise real pointer stacking, catalog drops into both halves of the large base, the full catalog, stable selection at multiple screen sizes, keyboard placement, search, views, units, undo/redo, downloads, imports, shared links, persistence, and mobile layout. The app loads no remote fonts, analytics, product images, or services.
 
 ## Publish
 

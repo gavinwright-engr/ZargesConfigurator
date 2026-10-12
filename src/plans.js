@@ -1,7 +1,7 @@
 /**
  * Portable plan I/O shared by files, share links, and browser storage.
  *
- * Treat every imported plan as untrusted. Only these six catalog model ids and
+ * Treat every imported plan as untrusted. Only known catalog model ids and
  * a small set of scalar instance fields cross the boundary. Labels, URLs, HTML,
  * and computed placement metadata always come from our own catalog/geometry.
  */
