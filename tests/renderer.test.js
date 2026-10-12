@@ -124,6 +124,44 @@ test("pointer inversion matches both human-scale camera settings", () => {
   }
 });
 
+test("selection outlines the full case envelope above neighboring artwork in every view", () => {
+  for (const view of ["iso", "front", "top"]) {
+    for (const selectedId of PRESET.map((box) => box.id)) {
+      const svg = renderScene(PRESET, CATALOG, {
+        view,
+        selectedId,
+        dimensions: true,
+        soccerScale: true,
+      });
+      const overlay = svg.match(/<g class="scene-selection"[\s\S]*?<\/g>/)?.[0];
+      assert(overlay);
+      assert.match(overlay, /pointer-events="none" aria-hidden="true"/);
+      assert.match(svg, /<g class="scene-selection"[\s\S]*<\/g>\s*<\/svg>$/);
+      const selectionPoints = overlay.match(/points="([^"]+)"/)[1];
+      assert.equal(selectionPoints, firstPolygon(svg, selectedId));
+      assert.equal((svg.match(/class="box-selection"/g) || []).length, 1);
+      assert.equal(
+        (overlay.match(/class="box-selection-edge"/g) || []).length,
+        view === "iso" ? 3 : 0,
+        "3D selection must also outline the front/side/lid seams",
+      );
+      assert.equal(
+        drawOrder(svg).length,
+        PRESET.length,
+        "The overlay must not create another selectable case",
+      );
+      const withoutOverlay = svg.replace(overlay, "");
+      assert.doesNotMatch(withoutOverlay, /class="box-selection"/);
+    }
+  }
+  for (const selectedId of [null, "unknown-case"]) {
+    assert.doesNotMatch(
+      renderScene(PRESET, CATALOG, { selectedId }),
+      /class="scene-selection"/,
+    );
+  }
+});
+
 function polygonPoints(markup) {
   return markup
     .match(/points="([^"]+)"/)[1]

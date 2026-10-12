@@ -150,6 +150,10 @@ collision, support, capacity, mass, or order quantities. Thumbnails omit them.
 `workspace: false` omits the bounded floor for isolated product illustrations.
 Case panels, hardware, and labels remain inside their maximum envelopes;
 the selection highlight is the only intentional outline outside a case.
+Selection is a final SVG overlay with pointer events disabled. It traces the
+selected envelope and, in 3D, all three visible face seams. Neighboring cases
+cannot paint over its edges, and it does not change artwork order, hit targets,
+or camera bounds.
 
 The catalog includes the complete 25-size standard European K 470 Universal Box
 range. The six reference models are marked `reference: true`; that flag changes

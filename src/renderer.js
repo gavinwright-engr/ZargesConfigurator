@@ -326,6 +326,61 @@ function faceLabel(
   </g>`;
 }
 
+// The clipping boundary and selection outline share one physical envelope.
+// Selection is painted separately, after the scene, so adjacent/upper cases
+// cannot erase an edge of the selected volume.
+function boxEnvelope(box, view) {
+  const { x, y, z, length, width, height } = box;
+  const top = z + height;
+  if (view === "top")
+    return [
+      [x, y, top],
+      [x + length, y, top],
+      [x + length, y + width, top],
+      [x, y + width, top],
+    ];
+  if (view === "front")
+    return [
+      [x, y, z],
+      [x + length, y, z],
+      [x + length, y, top],
+      [x, y, top],
+    ];
+  return [
+    [x, y + width, top],
+    [x + length, y + width, top],
+    [x + length, y, top],
+    [x + length, y, z],
+    [x, y, z],
+    [x, y + width, z],
+  ];
+}
+
+function drawSelection(box, drawing, view, prefix) {
+  if (!box) return "";
+  const stroke = 'stroke="#008ed2" stroke-width="2" stroke-linejoin="round"';
+  let faceEdges = "";
+  if (view === "iso") {
+    // The silhouette alone omits the front face's top and left edges. Add the
+    // three seams where the visible front, side, and lid meet, without doubling
+    // any strokes or drawing the hidden rear/bottom edges of a wireframe cube.
+    const { x, y, z, length, width, height } = box;
+    const corner = [x, y, z + height];
+    faceEdges = [
+      [x + length, y, z + height],
+      [x, y + width, z + height],
+      [x, y, z],
+    ]
+      .map((end) =>
+        drawing.line(corner, end, `class="box-selection-edge" ${stroke}`),
+      )
+      .join("");
+  }
+  return `<g class="scene-selection" data-selected-box-id="${escape(box.id)}" pointer-events="none" aria-hidden="true">
+    ${drawing.polygon(boxEnvelope(box, view), "none", `class="box-selection" ${stroke} filter="url(#${prefix}-selection)"`)}${faceEdges}
+  </g>`;
+}
+
 function drawBox(box, drawing, options, scale, prefix) {
   const { x, y, z, length, width, height, model } = box;
   const { polygon, line, paint, project } = drawing;
@@ -351,19 +406,7 @@ function drawBox(box, drawing, options, scale, prefix) {
     [x + length - inset, y + width - inset, level],
     [x + inset, y + width - inset, level],
   ];
-  const envelope =
-    options.view === "top"
-      ? lid(0, top)
-      : options.view === "front"
-        ? front(x, x + length, z, top)
-        : [
-            [x, y + width, top],
-            [x + length, y + width, top],
-            [x + length, y, top],
-            [x + length, y, z],
-            [x, y, z],
-            [x, y + width, z],
-          ];
+  const envelope = boxEnvelope(box, options.view);
   const clipId = `${prefix}-envelope-${String(box.id).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
   let art = "";
   let capacity = "";
@@ -598,18 +641,10 @@ function drawBox(box, drawing, options, scale, prefix) {
       <text text-anchor="middle" y="${font * 0.34}" font-family="Inter,Arial,sans-serif" font-size="${font}" font-weight="600" fill="#fff">${escape(label)}</text>
     </g>`;
   }
-  const selection =
-    options.selectedId === box.id
-      ? polygon(
-          envelope,
-          "none",
-          `class="box-selection" pointer-events="none" stroke="#008ed2" stroke-width="2" stroke-linejoin="round" filter="url(#${prefix}-selection)"`,
-        )
-      : "";
   return `<g class="case-object${options.selectedId === box.id ? " is-selected" : ""}" data-box-id="${escape(box.id)}" role="button" tabindex="0" aria-label="${escape(`${model.volume} litre ${model.name || "case"}, ${length} by ${width} by ${height} millimetres`)}" style="cursor:grab">
     <title>${escape(`${model.name || model.id} · ${model.volume} L · ${length} × ${width} × ${height} mm`)}</title>
     <defs><clipPath id="${clipId}">${polygon(envelope, "#fff", 'class="box-envelope"')}</clipPath></defs>
-    <g class="box-art" clip-path="url(#${clipId})">${art}</g>${selection}${capacity}
+    <g class="box-art" clip-path="url(#${clipId})">${art}</g>${capacity}
   </g>`;
 }
 
@@ -828,6 +863,12 @@ export function renderScene(boxes, catalog, options = {}) {
     ${settings.humanScale ? drawHumanScale(items, transform, settings.view, settings.units) : ""}
     ${settings.soccerScale ? drawSoccerScale(items, transform, settings.view, settings.units, prefix) : ""}
     ${settings.dimensions ? drawDimensions(items, drawing, settings.selectedId, settings.view, settings.units) : ""}
+    ${drawSelection(
+      items.find((box) => box.id === settings.selectedId),
+      drawing,
+      settings.view,
+      prefix,
+    )}
   </svg>`;
 }
 

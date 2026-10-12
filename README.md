@@ -32,7 +32,7 @@ Open **http://localhost:3000**. To produce a deployable static folder, run `npm 
 
 - **Build a stack:** drag from the catalog, or add a case with + and move it in the workspace. Edges snap; overlapping and unsupported placements are rejected.
 - **Explore the full catalog:** browse or search all 25 standard K 470 sizes, or filter to the six models in the reference arrangement. The catalog scrolls independently of the workspace.
-- **Place precisely:** select a case to rotate, remove, or move it in 10 mm steps. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
+- **Place precisely:** select a case to rotate, remove, or move it in 10 mm steps. Its complete edge highlight stays visible through neighboring cases, including the front/side/lid seams in 3D. Use the **Place on** surface selector to stack cases with a keyboard or touch screen.
 - **Copy and paste:** select a case and use **Ctrl/Cmd+C**, then **Ctrl/Cmd+V**, or the **Copy** and **Paste** buttons. Each copy keeps its model and rotation and appears in a nearby clear floor spot. Pasting is undoable; text fields retain normal text editing.
 - **Place cases in front or behind:** the **4.5 × 2.4 m** floor leaves **900 mm of free space on each side** of the reference setup in the depth direction. Drag new cases into either area. The floor stays fixed while you build; the camera keeps the cases close.
 - **Keep cases together:** the height limit is **3 m**, and gaps between neighboring stacks can be at most **60 cm**. Distant drops stay in their original position; new cases use nearby rows. These are planner settings, not manufacturer limits.
