@@ -10,11 +10,11 @@ An independent, open-source product concept by Gavin Wright. Not affiliated with
 
 ## See it in action
 
-[**Watch the video demo — MP4**](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
+[**Watch the 43-second demo — MP4**](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
 
 [![Screen recording: select cases, copy and paste, switch views, drag a case onto a stack, and export the box list](docs/media/demo.gif)](https://github.com/gavinwright-engr/ZargesConfigurator/blob/main/docs/media/demo.mp4)
 
-The recording opens with **both the person and soccer ball off**, giving the cases the full workspace. It demonstrates visible-edge selection, the complete catalog, copy/paste, dimensions, front/top/3D views, actual drag-and-drop stacking, CSV export, and fit information. The optional scale references appear briefly later in the tour. [Reproduce the screenshots and recording](docs/media/README.md).
+The recording opens with **both the person and soccer ball off**, giving the cases the full workspace. A large highlighted cursor moves smoothly through visible-edge selection, the complete catalog, copy/paste, dimensions, front/top/3D views, actual drag-and-drop stacking, CSV export, and fit information. The optional scale references appear briefly later in the tour. [Reproduce the screenshots and recording](docs/media/README.md).
 
 ## Run it
 

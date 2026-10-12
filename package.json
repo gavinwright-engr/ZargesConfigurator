@@ -2,7 +2,12 @@
   "name": "zarges-stack-planner",
   "version": "1.0.0",
   "private": true,
-  "description": "A dimensionally accurate, browser-based K 470 aluminum case planner.",
+  "description": "Independent browser-based ZARGES K 470 stack planner with all 25 standard sizes, drag-and-drop layouts, published dimensions, and optional scale references.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gavinwright-engr/ZargesConfigurator.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "node scripts/serve.js",
